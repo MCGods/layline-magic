@@ -1,5 +1,6 @@
 package com.example.laylines;
 
+import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.saveddata.LaylinesData;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -92,6 +93,7 @@ public class LaylinesMod {
 
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
+        MinecraftForge.EVENT_BUS.register(new LaylineStickListener());
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
@@ -124,7 +126,13 @@ public class LaylinesMod {
     public void onServerStarting(ServerStartingEvent event) {
         // Do something when the server starts
         LOGGER.info("HELLO from server starting");
-        event.getServer().overworld().getDataStorage().computeIfAbsent(LaylinesData.factory(), "laylines");
+        // Overworld DimensionDataStorage is the global slot for laylines.dat.
+        // computeIfAbsent loads from disk when the file exists, otherwise constructs
+        // an empty LaylinesData via factory(). Minecraft writes it back on save
+        // whenever the instance is marked dirty.
+        LaylinesData laylinesData = event.getServer().overworld().getDataStorage()
+                .computeIfAbsent(LaylinesData.factory(), LaylinesData.DATA_NAME);
+        LOGGER.info("Laylines data ready ({} nodes)", laylinesData.getNodes().size());
 
     }
 
