@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "laylines:block/example_block"
+    }
+  }
+}
