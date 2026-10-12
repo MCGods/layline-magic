@@ -15,16 +15,33 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Vanilla stick debug tool (README Section 4 / Phase 1).
  *
- * Right-click: report 2D distance to the nearest stored layline node.
- * Sneak + right-click a block: plant a random node at that block for testing.
+ * Two operational modes:
+ * - READ_ONLY (default): calculate closest node without creating/saving new
+ * nodes
+ * - DEBUG_PLANT: instantiate and save new nodes to world data
+ *
+ * Sneak + right-click: toggle between modes
+ * Normal right-click: perform action based on current mode
  */
 public class LaylineStickListener {
+
+    /** Operational modes for the layline stick */
+    public enum StickMode {
+        READ_ONLY,
+        DEBUG_PLANT
+    }
+
+    /** Tracks the current mode for each player by UUID */
+    private static final Map<UUID, StickMode> playerModes = new HashMap<>();
 
     @SubscribeEvent
     public void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
@@ -33,17 +50,23 @@ public class LaylineStickListener {
         }
 
         Player player = event.getEntity();
-        // Sneak-clicking a block is handled by {@link #onRightClickBlock}; skip the
-        // scan so we do not print "no laylines" in the same click as a spawn.
-        if (player.isShiftKeyDown()) {
-            return;
-        }
-
         if (!(player instanceof ServerPlayer serverPlayer) || serverPlayer.getServer() == null) {
             return;
         }
 
-        sendNearestNodeReport(serverPlayer);
+        // Sneak + right-click toggles mode
+        if (player.isShiftKeyDown()) {
+            toggleStickMode(serverPlayer);
+            return;
+        }
+
+        // Normal right-click performs action based on current mode
+        StickMode mode = getStickMode(player);
+        if (mode == StickMode.READ_ONLY) {
+            sendNearestNodeReportReadOnly(serverPlayer);
+        } else {
+            sendNearestNodeReportPlant(serverPlayer);
+        }
     }
 
     @SubscribeEvent
@@ -53,25 +76,33 @@ public class LaylineStickListener {
         }
 
         Player player = event.getEntity();
-        if (!player.isShiftKeyDown()) {
-            return;
-        }
         if (!(player instanceof ServerPlayer serverPlayer) || serverPlayer.getServer() == null) {
             return;
         }
 
-        BlockPos clicked = event.getPos();
-        LaylineNode node = new LaylineNode(clicked);
-        LaylinesData.get(serverPlayer.getServer()).putNode(node);
+        // Sneak + right-click toggles mode
+        if (player.isShiftKeyDown()) {
+            toggleStickMode(serverPlayer);
+            return;
+        }
 
-        String typeLabel = node.getGeneratingType() == null
-                ? "none"
-                : node.getGeneratingType().name();
-        serverPlayer.displayClientMessage(Component.literal(String.format(
-                Locale.ROOT,
-                "Spawned layline node at %s | generating: %s",
-                formatPos(clicked),
-                typeLabel)), true);
+        // Normal right-click performs action based on current mode
+        StickMode mode = getStickMode(player);
+        if (mode == StickMode.DEBUG_PLANT) {
+            BlockPos clicked = event.getPos();
+            LaylineNode node = new LaylineNode(clicked);
+            LaylinesData.get(serverPlayer.getServer()).putNode(node);
+
+            String typeLabel = node.getGeneratingType() == null
+                    ? "none"
+                    : node.getGeneratingType().name();
+            serverPlayer.displayClientMessage(Component.literal(String.format(
+                    Locale.ROOT,
+                    "[PLANT] Instantiating new node at %s | generating: %s",
+                    formatPos(clicked),
+                    typeLabel)), true);
+        }
+        // READ_ONLY mode does nothing on block click
     }
 
     private static boolean isServerStickUse(PlayerInteractEvent event) {
@@ -84,7 +115,65 @@ public class LaylineStickListener {
         return event.getItemStack().is(Items.STICK);
     }
 
-    private static void sendNearestNodeReport(ServerPlayer player) {
+    private static StickMode getStickMode(Player player) {
+        return playerModes.computeIfAbsent(player.getUUID(), k -> StickMode.READ_ONLY);
+    }
+
+    private static void toggleStickMode(ServerPlayer player) {
+        StickMode current = getStickMode(player);
+        StickMode newMode = current == StickMode.READ_ONLY ? StickMode.DEBUG_PLANT : StickMode.READ_ONLY;
+        playerModes.put(player.getUUID(), newMode);
+        player.displayClientMessage(Component.literal("Layline Stick Mode: " + newMode.name()), true);
+    }
+
+    /**
+     * Read-only mode: calculates closest node without creating or saving new nodes.
+     * Checks both mathematical cell positions and actual saved nodes from
+     * LaylinesData. Also reports distance to the closest layline edge.
+     */
+    private static void sendNearestNodeReportReadOnly(ServerPlayer player) {
+        LaylinesData data = LaylinesData.get(player.getServer());
+        long seed = player.serverLevel().getSeed();
+        String dimensionId = player.level().dimension().location().toString();
+        BlockPos playerPos = player.blockPosition();
+
+        LaylineNode closest = findClosestNodeReadOnly(seed, dimensionId, playerPos, data);
+        if (closest == null) {
+            player.displayClientMessage(Component.literal("[READ] No laylines detected in this world."), true);
+            return;
+        }
+
+        double closestDist = LaylineGraphUtil.horizontalDistance(playerPos, closest.getPosition());
+        String typeLabel = closest.getGeneratingType() == null
+                ? "none"
+                : closest.getGeneratingType().name();
+
+        // Find closest edge
+        com.example.laylines.utils.LaylineGraphUtil.LaylineEdge closestEdge = LaylineGraphUtil.findClosestEdge(seed,
+                dimensionId, playerPos, player.serverLevel());
+        double edgeDist = closestEdge != null
+                ? LaylineGraphUtil.pointToLineSegmentDistance(playerPos, closestEdge.nodeA(), closestEdge.nodeB())
+                : -1;
+
+        String edgeMessage = edgeDist >= 0
+                ? String.format(Locale.ROOT, " | Closest Edge: %.1f blocks", edgeDist)
+                : " | No edges detected";
+
+        player.displayClientMessage(Component.literal(String.format(Locale.ROOT,
+                "[READ] Closest Node: %.1f blocks away | Generator: %s%s",
+                closestDist, typeLabel, edgeMessage)), true);
+
+        for (String line : formatNodeChatDump(closest)) {
+            player.sendSystemMessage(Component.literal(line));
+        }
+    }
+
+    /**
+     * Debug plant mode: calculates closest node and creates/saves it at the
+     * clicked block position.
+     * Uses the data-driven approach reading from LaylinesData.
+     */
+    private static void sendNearestNodeReportPlant(ServerPlayer player) {
         LaylinesData data = LaylinesData.get(player.getServer());
         long seed = player.serverLevel().getSeed();
         String dimensionId = player.level().dimension().location().toString();
@@ -92,7 +181,7 @@ public class LaylineStickListener {
 
         LaylineNode closest = LaylineGraphUtil.findClosestNode(seed, dimensionId, playerPos, data);
         if (closest == null) {
-            player.displayClientMessage(Component.literal("No laylines detected in this world."), true);
+            player.displayClientMessage(Component.literal("[PLANT] No laylines detected in this world."), true);
             return;
         }
 
@@ -101,12 +190,40 @@ public class LaylineStickListener {
                 ? "none"
                 : closest.getGeneratingType().name();
         player.displayClientMessage(Component.literal(String.format(Locale.ROOT,
-                "Closest Node: %.1f blocks away | Generator: %s",
+                "[PLANT] Closest Node: %.1f blocks away | Generator: %s",
                 closestDist, typeLabel)), true);
 
         for (String line : formatNodeChatDump(closest)) {
             player.sendSystemMessage(Component.literal(line));
         }
+    }
+
+    /**
+     * Read-only node lookup using a pure data-driven approach.
+     *
+     * Iterates over all nodes currently registered in LaylinesData and performs
+     * a 2D distance calculation (X/Z only, ignoring Y) to find the true closest
+     * node.
+     * This approach works correctly even when nodes are moved or carved from their
+     * original seed positions (e.g., structure-anchored nodes).
+     *
+     * Does not create or save new nodes - only reads from existing data.
+     */
+    private static LaylineNode findClosestNodeReadOnly(long seed, String dimensionId, BlockPos playerPos,
+            LaylinesData data) {
+        LaylineNode closest = null;
+        double closestDist = Double.MAX_VALUE;
+
+        // Iterate over all actual saved nodes from LaylinesData
+        for (LaylineNode node : data.getNodes().values()) {
+            double dist = LaylineGraphUtil.horizontalDistance(playerPos, node.getPosition());
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = node;
+            }
+        }
+
+        return closest;
     }
 
     /** One chat line per field so the dump stays readable in the history. */

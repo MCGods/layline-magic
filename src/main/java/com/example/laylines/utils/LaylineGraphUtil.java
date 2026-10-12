@@ -5,7 +5,10 @@ import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -16,9 +19,19 @@ import java.util.UUID;
  * Each cell owns exactly one node whose X/Z offset is mixed from the world
  * seed, cell index, and dimension id — independent of chunk load order.
  *
- * Delaunay edges are not computed here yet; this class only places vertices.
+ * This utility uses a unified database model where LaylinesData is the source
+ * of truth. Nodes are physically instantiated during chunk generation by
+ * LaylineWorldGenListener, and edges are calculated by pulling coordinates
+ * from the database with seed-math fallback for ungenerated chunks.
  */
 public final class LaylineGraphUtil {
+
+    /**
+     * Represents a connection between two layline nodes.
+     * Edges form the infinite web that carries energy across the world.
+     */
+    public static record LaylineEdge(BlockPos nodeA, BlockPos nodeB) {
+    }
 
     /**
      * Block width/depth of one layout cell. A random 0–255 offset inside the
@@ -66,45 +79,32 @@ public final class LaylineGraphUtil {
     }
 
     /**
-     * Returns the saved node for this cell, or creates and persists one.
-     * Identity is the deterministic cell BlockPos (not UUID), so the first
-     * visit to a cell wins and later visits reuse it.
-     */
-    public static LaylineNode getOrCreateNodeForCell(long seed, String dimensionId, int cellX, int cellZ,
-            LaylinesData data) {
-        CellRoll roll = rollCell(seed, dimensionId, cellX, cellZ);
-
-        for (LaylineNode existing : data.getNodes().values()) {
-            if (existing.getPosition().equals(roll.position)) {
-                return existing;
-            }
-        }
-
-        LaylineNode created = new LaylineNode(roll.id, roll.position, roll.generatingType);
-        data.putNode(created);
-        return created;
-    }
-
-    /**
-     * Closest node to {@code playerPos} among the player's cell and its 8
-     * neighbors (3×3). Missing cells are created so teleport/chunk order
-     * cannot change the local graph.
+     * Closest node to {@code playerPos} using a pure data-driven approach.
+     *
+     * Iterates over all nodes currently registered in LaylinesData and performs
+     * a 2D distance calculation (X/Z only, ignoring Y) to find the true closest
+     * node.
+     * This approach works correctly with our unified database model where all
+     * nodes are instantiated during chunk generation.
+     *
+     * @param seed        World seed (unused in data-driven mode but kept for API
+     *                    compatibility)
+     * @param dimensionId Dimension ID (unused in data-driven mode but kept for API
+     *                    compatibility)
+     * @param playerPos   The player's position to measure distance from
+     * @param data        The LaylinesData containing all registered nodes
+     * @return The closest node, or null if no nodes exist
      */
     public static LaylineNode findClosestNode(long seed, String dimensionId, BlockPos playerPos, LaylinesData data) {
-        int cellX = toCell(playerPos.getX());
-        int cellZ = toCell(playerPos.getZ());
-
         LaylineNode closest = null;
         double closestDist = Double.MAX_VALUE;
 
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                LaylineNode node = getOrCreateNodeForCell(seed, dimensionId, cellX + dx, cellZ + dz, data);
-                double dist = horizontalDistance(playerPos, node.getPosition());
-                if (dist < closestDist) {
-                    closestDist = dist;
-                    closest = node;
-                }
+        // Iterate over all actual saved nodes from LaylinesData
+        for (LaylineNode node : data.getNodes().values()) {
+            double dist = horizontalDistance(playerPos, node.getPosition());
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = node;
             }
         }
 
@@ -116,6 +116,169 @@ public final class LaylineGraphUtil {
         double dx = (double) a.getX() - b.getX();
         double dz = (double) a.getZ() - b.getZ();
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /**
+     * Gets the deterministic node position for a cell using the database as source
+     * of truth.
+     *
+     * First checks LaylinesData for existing nodes in this cell (which includes
+     * structure-anchored nodes from world gen). If found, returns that position.
+     * Otherwise, falls back to the standard cell seed-offset mathematical
+     * calculation
+     * for smooth edge prediction in ungenerated chunks.
+     *
+     * This approach is data-driven and consistent with our unified database model -
+     * nodes are instantiated during chunk load (LaylineWorldGenListener), so we
+     * query
+     * the saved data first. The seed-math fallback ensures the stick reads smoothly
+     * even when looking at ungenerated chunks.
+     *
+     * @param seed        World seed
+     * @param dimensionId Dimension identifier
+     * @param cellX       Cell X coordinate
+     * @param cellZ       Cell Z coordinate
+     * @param level       Server level for accessing LaylinesData
+     * @return The deterministic node position for this cell
+     */
+    public static BlockPos getDeterministicNodePos(long seed, String dimensionId, int cellX, int cellZ,
+            ServerLevel level) {
+        // Check LaylinesData for existing nodes in this cell
+        LaylinesData data = LaylinesData.get(level.getServer());
+        BlockPos cellPos = positionForCell(seed, dimensionId, cellX, cellZ);
+
+        // Look for a node that falls within this cell's bounds
+        int cellMinX = cellX * CELL_SIZE;
+        int cellMinZ = cellZ * CELL_SIZE;
+        int cellMaxX = cellMinX + CELL_SIZE - 1;
+        int cellMaxZ = cellMinZ + CELL_SIZE - 1;
+
+        for (LaylineNode node : data.getNodes().values()) {
+            BlockPos nodePos = node.getPosition();
+            if (nodePos.getX() >= cellMinX && nodePos.getX() <= cellMaxX &&
+                    nodePos.getZ() >= cellMinZ && nodePos.getZ() <= cellMaxZ) {
+                // Found a node in this cell (could be structure-anchored)
+                return nodePos;
+            }
+        }
+
+        // Fallback to standard seed-offset calculation for ungenerated chunks
+        return cellPos;
+    }
+
+    /**
+     * Generates runtime edges for a cell and its East/South neighbors.
+     *
+     * Calculates the true deterministic positions of the current cell, its East
+     * neighbor
+     * (+1 cellX), and its South neighbor (+1 cellZ) by pulling coordinates from
+     * LaylinesData. If a node hasn't been generated yet (ungenerated chunks), it
+     * temporarily falls back to seed-math prediction for smooth stick reading.
+     * Returns a list of LaylineEdge connections between them, creating a continuous
+     * grid web that bends toward structure-anchored nodes.
+     *
+     * @param seed        World seed
+     * @param dimensionId Dimension identifier
+     * @param cellX       Cell X coordinate
+     * @param cellZ       Cell Z coordinate
+     * @param level       Server level for accessing LaylinesData
+     * @return List of edges originating from this cell
+     */
+    public static List<LaylineEdge> getEdgesForCell(long seed, String dimensionId, int cellX, int cellZ,
+            ServerLevel level) {
+        List<LaylineEdge> edges = new ArrayList<>();
+
+        BlockPos currentPos = getDeterministicNodePos(seed, dimensionId, cellX, cellZ, level);
+        BlockPos eastPos = getDeterministicNodePos(seed, dimensionId, cellX + 1, cellZ, level);
+        BlockPos southPos = getDeterministicNodePos(seed, dimensionId, cellX, cellZ + 1, level);
+
+        // Create edge to East neighbor
+        edges.add(new LaylineEdge(currentPos, eastPos));
+
+        // Create edge to South neighbor
+        edges.add(new LaylineEdge(currentPos, southPos));
+
+        return edges;
+    }
+
+    /**
+     * Finds the closest edge to the player's position using a localized 3x3 cell
+     * lookup.
+     *
+     * Restricts calculation strictly to a 3x3 grid of cells surrounding the player
+     * to
+     * prevent server ticking lag. Generates runtime edges for those 9 cells,
+     * performs
+     * a 2D point-to-line-segment distance calculation (ignoring Y), and returns the
+     * absolute closest edge.
+     *
+     * @param seed        World seed
+     * @param dimensionId Dimension identifier
+     * @param playerPos   The player's position
+     * @param level       Server level for structure placement lookup
+     * @return The closest edge, or null if no edges exist
+     */
+    public static LaylineEdge findClosestEdge(long seed, String dimensionId, BlockPos playerPos, ServerLevel level) {
+        int cellX = toCell(playerPos.getX());
+        int cellZ = toCell(playerPos.getZ());
+
+        LaylineEdge closestEdge = null;
+        double closestDist = Double.MAX_VALUE;
+
+        // Generate edges for the 3x3 cell grid surrounding the player
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                List<LaylineEdge> cellEdges = getEdgesForCell(seed, dimensionId, cellX + dx, cellZ + dz, level);
+
+                for (LaylineEdge edge : cellEdges) {
+                    double dist = pointToLineSegmentDistance(playerPos, edge.nodeA(), edge.nodeB());
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestEdge = edge;
+                    }
+                }
+            }
+        }
+
+        return closestEdge;
+    }
+
+    /**
+     * Calculates the shortest distance from a point to a line segment in 2D (X/Z
+     * only).
+     *
+     * @param point     The point to measure from
+     * @param lineStart The start of the line segment
+     * @param lineEnd   The end of the line segment
+     * @return The shortest distance from the point to the line segment
+     */
+    public static double pointToLineSegmentDistance(BlockPos point, BlockPos lineStart, BlockPos lineEnd) {
+        double px = point.getX();
+        double pz = point.getZ();
+        double x1 = lineStart.getX();
+        double z1 = lineStart.getZ();
+        double x2 = lineEnd.getX();
+        double z2 = lineEnd.getZ();
+
+        // Vector from lineStart to lineEnd
+        double dx = x2 - x1;
+        double dz = z2 - z1;
+
+        // If the line segment is a point, return distance to that point
+        if (dx == 0 && dz == 0) {
+            return Math.sqrt((px - x1) * (px - x1) + (pz - z1) * (pz - z1));
+        }
+
+        // Project point onto the line, clamped to the segment
+        double t = ((px - x1) * dx + (pz - z1) * dz) / (dx * dx + dz * dz);
+        t = Math.max(0, Math.min(1, t));
+
+        // Closest point on the segment
+        double closestX = x1 + t * dx;
+        double closestZ = z1 + t * dz;
+
+        // Distance from point to closest point on segment
+        return Math.sqrt((px - closestX) * (px - closestX) + (pz - closestZ) * (pz - closestZ));
     }
 
     /**

@@ -1,10 +1,14 @@
 package com.example.laylines;
 
+import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
+import com.example.laylines.event.LaylineWorldGenListener;
+import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
 import com.example.laylines.saveddata.LaylinesData;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -26,6 +30,9 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.network.ChannelBuilder;
+import net.minecraftforge.network.NetworkDirection;
+import net.minecraftforge.network.SimpleChannel;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -38,6 +45,9 @@ public class LaylinesMod {
     public static final String MODID = "laylines";
     // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    // Network channel for layline sync packets
+    public static SimpleChannel PACKET_HANDLER;
     // Create a Deferred Register to hold Blocks which will all be registered under
     // the "examplemod" namespace
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
@@ -94,6 +104,8 @@ public class LaylinesMod {
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new LaylineStickListener());
+        MinecraftForge.EVENT_BUS.register(new LaylineWorldGenListener());
+        MinecraftForge.EVENT_BUS.register(new LaylineServerTickListener());
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
@@ -106,6 +118,19 @@ public class LaylinesMod {
     private void commonSetup(final FMLCommonSetupEvent event) {
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
+
+        // Initialize network channel
+        PACKET_HANDLER = ChannelBuilder
+                .named(new ResourceLocation(MODID, "main"))
+                .networkProtocolVersion(1)
+                .simpleChannel();
+
+        // Register network packet
+        PACKET_HANDLER.messageBuilder(ClientboundLaylineSyncPacket.class, 0, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundLaylineSyncPacket::encode)
+                .decoder(ClientboundLaylineSyncPacket::new)
+                .consumerMainThread(ClientboundLaylineSyncPacket::handle)
+                .add();
 
         if (Config.logDirtBlock)
             LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
