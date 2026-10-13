@@ -1,17 +1,20 @@
 package com.example.laylines.event;
 
+import org.joml.Vector3f;
+
 import com.example.laylines.LaylinesMod;
 import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
 import com.example.laylines.network.packet.LaylineParticleCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.joml.Vector3f;
 
 /**
  * Client-side tick listener for Golden Sight particle rendering.
@@ -26,7 +29,7 @@ public class LaylineClientTickListener {
     private static int tickCounter = 0;
     private static final int TICK_INTERVAL = 2; // Update every 2 ticks (10 times per second)
     private static final int PARTICLES_PER_EDGE = 3; // Number of new particles per edge per update
-    private static final float FLOW_SPEED = 0.2f; // Speed of particle flow along the edge
+    private static final float FLOW_SPEED = 10f; // Speed of particle flow along the edge
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
@@ -46,6 +49,12 @@ public class LaylineClientTickListener {
         }
         tickCounter = 0;
 
+        ItemStack helmetItem = mc.player.getInventory().getArmor(3); // Index 3 is helmet
+        if (helmetItem.isEmpty() || !helmetItem.is(Items.GOLDEN_HELMET)) {
+            LaylineParticleCache.clear();
+            return;
+        }
+
         // Get cached edges from server
         var edges = LaylineParticleCache.getLocalEdges();
         if (edges.isEmpty()) {
@@ -60,18 +69,24 @@ public class LaylineClientTickListener {
 
     /**
      * Spawns animated dust particles along an edge with elemental coloring.
-     * Particles use native velocity to flow from Node A to Node B naturally.
+     * Particles use velocity to flow from Node A to Node B.
      */
     private static void spawnEdgeParticles(ClientboundLaylineSyncPacket.EdgeData edge, Minecraft mc) {
         BlockPos nodeA = edge.nodeA();
         BlockPos nodeB = edge.nodeB();
-        // (Colors can be added to your custom particle pipeline later, Portal provides
-        // a purple/magenta default)
+        AttributeType attributeType = edge.attributeType();
+
+        // Get color for this attribute type
+        Vector3f color = new Vector3f(
+                getParticleRed(attributeType),
+                getParticleGreen(attributeType),
+                getParticleBlue(attributeType));
 
         // Calculate vectors from A to B
         double dx = nodeB.getX() - nodeA.getX();
         double dy = nodeB.getY() - nodeA.getY();
         double dz = nodeB.getZ() - nodeA.getZ();
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
         // Spawn a steady sequence of moving light beads scattered along the segment
         for (int i = 0; i < PARTICLES_PER_EDGE; i++) {
@@ -96,7 +111,7 @@ public class LaylineClientTickListener {
             // By subtracting the vector from the spawn point, it forces it to travel
             // FORWARD along the layline!
             mc.level.addAlwaysVisibleParticle(
-                    net.minecraft.core.particles.ParticleTypes.PORTAL,
+                    ParticleTypes.PORTAL,
                     true, // Force render over long distances
                     x - flowVectorX,
                     y - flowVectorY,
