@@ -35,12 +35,44 @@ public class Config {
                         .comment("A list of items to log on common setup.")
                         .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), Config::validateItemName);
 
+        private static final ForgeConfigSpec.BooleanValue MIRACLE_GROWTH_ENABLED = BUILDER
+                        .comment("Whether Earth laylines accelerate nearby crops.")
+                        .define("miracleGrowth.enabled", true);
+
+        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_INTERVAL_TICKS = BUILDER
+                        .comment("Ticks between miracle growth pulses (20 ticks = 1 second).")
+                        .defineInRange("miracleGrowth.intervalTicks", 20, 1, 72000);
+
+        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_RADIUS = BUILDER
+                        .comment("Maximum horizontal distance in blocks from an Earth layline edge.")
+                        .defineInRange("miracleGrowth.radius", 10, 1, 64);
+
+        private static final ForgeConfigSpec.DoubleValue MIRACLE_GROWTH_EARTH_COST = BUILDER
+                        .comment("Earth energy consumed for each crop accelerated.")
+                        .defineInRange("miracleGrowth.earthCostPerCrop", 1.0, 0.0, 100.0);
+
         static final ForgeConfigSpec SPEC = BUILDER.build();
 
         public static boolean logDirtBlock;
         public static int magicNumber;
         public static String magicNumberIntroduction;
         public static Set<Item> items;
+
+        public static boolean isMiracleGrowthEnabled() {
+                return MIRACLE_GROWTH_ENABLED.get();
+        }
+
+        public static int getMiracleGrowthIntervalTicks() {
+                return MIRACLE_GROWTH_INTERVAL_TICKS.get();
+        }
+
+        public static int getMiracleGrowthRadius() {
+                return MIRACLE_GROWTH_RADIUS.get();
+        }
+
+        public static double getMiracleGrowthEarthCost() {
+                return MIRACLE_GROWTH_EARTH_COST.get();
+        }
 
         private static boolean validateItemName(final Object obj) {
                 return obj instanceof final String itemName

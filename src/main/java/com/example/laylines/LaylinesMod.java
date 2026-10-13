@@ -1,5 +1,6 @@
 package com.example.laylines;
 
+import com.example.laylines.event.LaylineCommandHandler;
 import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
@@ -105,6 +106,7 @@ public class LaylinesMod {
                 // Register ourselves for server and other game events we are interested in
                 MinecraftForge.EVENT_BUS.register(this);
                 MinecraftForge.EVENT_BUS.register(new LaylineStickListener());
+                MinecraftForge.EVENT_BUS.register(new LaylineCommandHandler());
                 MinecraftForge.EVENT_BUS.register(new LaylineWorldGenListener());
                 MinecraftForge.EVENT_BUS.register(new LaylineServerTickListener());
 
