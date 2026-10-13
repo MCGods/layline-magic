@@ -40,8 +40,8 @@ public class Config {
                         .define("miracleGrowth.enabled", true);
 
         private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_INTERVAL_TICKS = BUILDER
-                        .comment("Ticks between miracle growth pulses (20 ticks = 1 second).")
-                        .defineInRange("miracleGrowth.intervalTicks", 20, 1, 72000);
+                        .comment("Seconds between miracle growth pulses.")
+                        .defineInRange("miracleGrowth.intervalTicks", 60, 1, 72000);
 
         private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_RADIUS = BUILDER
                         .comment("Maximum horizontal distance in blocks from an Earth layline edge.")
@@ -49,7 +49,11 @@ public class Config {
 
         private static final ForgeConfigSpec.DoubleValue MIRACLE_GROWTH_EARTH_COST = BUILDER
                         .comment("Earth energy consumed for each crop accelerated.")
-                        .defineInRange("miracleGrowth.earthCostPerCrop", 1.0, 0.0, 100.0);
+                        .defineInRange("miracleGrowth.earthCostPerCrop", 5.0, 0.0, 100.0);
+
+        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_SAMPLES_PER_EDGE = BUILDER
+                        .comment("Random crop locations tested along each energized Earth edge per pulse.")
+                        .defineInRange("miracleGrowth.samplesPerEdge", 8, 1, 128);
 
         static final ForgeConfigSpec SPEC = BUILDER.build();
 
@@ -62,8 +66,8 @@ public class Config {
                 return MIRACLE_GROWTH_ENABLED.get();
         }
 
-        public static int getMiracleGrowthIntervalTicks() {
-                return MIRACLE_GROWTH_INTERVAL_TICKS.get();
+        public static int getMiracleGrowthIntervalSeconds() {
+                return MIRACLE_GROWTH_INTERVAL_TICKS.get() * 20;
         }
 
         public static int getMiracleGrowthRadius() {
@@ -72,6 +76,10 @@ public class Config {
 
         public static double getMiracleGrowthEarthCost() {
                 return MIRACLE_GROWTH_EARTH_COST.get();
+        }
+
+        public static int getMiracleGrowthSamplesPerEdge() {
+                return MIRACLE_GROWTH_SAMPLES_PER_EDGE.get();
         }
 
         private static boolean validateItemName(final Object obj) {

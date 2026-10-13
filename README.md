@@ -30,7 +30,7 @@ Phenomena occur along the Layline Edges, drawing energy dynamically from connect
 
 | **Attribute** | **Phenomenon Idea** | **Mechanics & Consumption** |
 |---|---|---|
-| **Earth** | Faster crop growth | Consumes a set energy value (e.g., 10 Earth units) per block updated. |
+| **Earth** | Faster crop growth | Implemented as Miracle Growth: every 5 seconds, eligible crops in loaded chunks within 10 horizontal blocks of an energized Earth layline edge are bonemealed, consuming fixed Earth units. Y distance is ignored. Pulse interval, horizontal range, energy cost, and random samples per edge are configurable. |
 | **Air** | Speed buff / Fall damage immunity | Checked when a player enters the 10m radius. Consumes energy passively per active player. |
 | **Fire** | Fast smelting / Block heating | Speeds up furnace ticks or generates rare heat blocks. Minimally destructive (togglable). |
 | **Water** | Water Breathing | Grants passive breathing mechanics to players near or in water lines. |
@@ -43,6 +43,15 @@ Phenomena occur along the Layline Edges, drawing energy dynamically from connect
 * **Particle Systems:** Layline movement is displayed using slow-moving individual firework sparkles.
   * *Color:* Matches the active element's profile.
   * *Density:* Automatically scales thicker as energy density/flow value increases across that edge.
+
+### 5. Admin Commands
+Operators (permission level 2) can set the capacity and current value for one attribute pool on a layline node:
+
+```text
+/laylines pool set <uuid> <attribute> <capacity> <currentValue>
+```
+
+Attributes are `FIRE`, `WATER`, `EARTH`, `AIR`, `DARK`, or `LIGHT`. Both values must be non-negative, and current value cannot exceed capacity. The change is persisted with the world saved data.
 
 ---
 
@@ -66,7 +75,8 @@ Phenomena occur along the Layline Edges, drawing energy dynamically from connect
 
 ### 💥 Phase 5: World Phenomena & Ticking
 * Introduce the 10m boundary radius checking.
-* Implement Earth crop growth, Air speeds, Light healing, and corresponding energy drain mechanics filtered by biome weight modifiers.
+* [x] Implement world-based Earth crop growth (Miracle Growth) in loaded chunks, sampling randomly along energized edges with configurable interval, horizontal radius, energy cost, and sample count; vertical distance is ignored.
+* [ ] Implement Air speeds, Light healing, and biome-weighted energy costs.
 
 ### 🔌 Phase 6: External Mod Integrations
 * Expose API endpoints allowing external magic mods (or systems like Thaumcraft) to tap into Layline vectors for wand/reservoir recharging.

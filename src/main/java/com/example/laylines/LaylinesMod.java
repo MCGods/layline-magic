@@ -4,6 +4,7 @@ import com.example.laylines.event.LaylineCommandHandler;
 import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
+import com.example.laylines.event.MiracleGrowthHandler;
 import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
 import com.example.laylines.saveddata.LaylinesData;
 import com.mojang.logging.LogUtils;
@@ -109,6 +110,7 @@ public class LaylinesMod {
                 MinecraftForge.EVENT_BUS.register(new LaylineCommandHandler());
                 MinecraftForge.EVENT_BUS.register(new LaylineWorldGenListener());
                 MinecraftForge.EVENT_BUS.register(new LaylineServerTickListener());
+                MinecraftForge.EVENT_BUS.register(new MiracleGrowthHandler());
 
                 // Register the item to a creative tab
                 modEventBus.addListener(this::addCreative);

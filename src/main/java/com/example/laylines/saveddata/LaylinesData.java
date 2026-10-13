@@ -12,8 +12,10 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -137,6 +139,19 @@ public class LaylinesData extends SavedData {
 
     public LaylineNode getNode(UUID id) {
         return nodes.get(id);
+    }
+
+    /**
+     * Returns the nodes that generate the requested attribute.
+     */
+    public List<LaylineNode> getNodesGenerating(AttributeType type) {
+        List<LaylineNode> matchingNodes = new ArrayList<>();
+        for (LaylineNode node : nodes.values()) {
+            if (node.getGeneratingType() == type) {
+                matchingNodes.add(node);
+            }
+        }
+        return List.copyOf(matchingNodes);
     }
 
     /**

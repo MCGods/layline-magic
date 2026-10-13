@@ -8,8 +8,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -202,6 +206,45 @@ public final class LaylineGraphUtil {
     }
 
     /**
+     * Returns the grid edges connected to nodes generating {@code attribute}.
+     * Each matching node contributes its four adjacent edges; duplicates are
+     * removed when both endpoints generate the same attribute.
+     */
+    public static Set<LaylineEdge> getEdgesForAttribute(long seed, String dimensionId,
+            AttributeType attribute, LaylinesData data) {
+        Map<CellKey, LaylineNode> nodesByCell = new HashMap<>();
+        for (LaylineNode node : data.getNodes().values()) {
+            BlockPos position = node.getPosition();
+            nodesByCell.put(new CellKey(toCell(position.getX()), toCell(position.getZ())), node);
+        }
+
+        Set<LaylineEdge> edges = new HashSet<>();
+        for (LaylineNode node : data.getNodesGenerating(attribute)) {
+            BlockPos position = node.getPosition();
+            CellKey cell = new CellKey(toCell(position.getX()), toCell(position.getZ()));
+            BlockPos current = positionForCell(seed, dimensionId, cell, nodesByCell);
+            BlockPos east = positionForCell(seed, dimensionId, new CellKey(cell.x + 1, cell.z), nodesByCell);
+            BlockPos south = positionForCell(seed, dimensionId, new CellKey(cell.x, cell.z + 1), nodesByCell);
+            BlockPos west = positionForCell(seed, dimensionId, new CellKey(cell.x - 1, cell.z), nodesByCell);
+            BlockPos north = positionForCell(seed, dimensionId, new CellKey(cell.x, cell.z - 1), nodesByCell);
+
+            edges.add(new LaylineEdge(current, east));
+            edges.add(new LaylineEdge(current, south));
+            edges.add(new LaylineEdge(west, current));
+            edges.add(new LaylineEdge(north, current));
+        }
+        return edges;
+    }
+
+    private static BlockPos positionForCell(long seed, String dimensionId, CellKey cell,
+            Map<CellKey, LaylineNode> nodesByCell) {
+        LaylineNode node = nodesByCell.get(cell);
+        return node == null
+                ? positionForCell(seed, dimensionId, cell.x, cell.z)
+                : node.getPosition();
+    }
+
+    /**
      * Finds the closest edge to the player's position using a localized 3x3 cell
      * lookup.
      *
@@ -241,6 +284,30 @@ public final class LaylineGraphUtil {
         }
 
         return closestEdge;
+    }
+
+    /**
+     * Calculates a random position near an edge, within a specified radius.
+     * 
+     * @param edge   The edge to sample near
+     * @param radius The maximum distance from the edge to sample
+     * @param level  The server level
+     * @return A random position near the edge, within the specified radius
+     */
+    public static BlockPos randomPositionNearEdge(LaylineEdge edge,
+            double radius, ServerLevel level) {
+        double deltaX = edge.nodeB().getX() - edge.nodeA().getX();
+        double deltaZ = edge.nodeB().getZ() - edge.nodeA().getZ();
+        double length = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+        if (length == 0.0) {
+            return edge.nodeA();
+        }
+
+        double along = level.random.nextDouble();
+        double offset = (level.random.nextDouble() * 2.0 - 1.0) * radius;
+        double x = edge.nodeA().getX() + deltaX * along - deltaZ / length * offset;
+        double z = edge.nodeA().getZ() + deltaZ * along + deltaX / length * offset;
+        return new BlockPos((int) Math.round(x), 0, (int) Math.round(z));
     }
 
     /**
@@ -308,5 +375,8 @@ public final class LaylineGraphUtil {
     }
 
     private record CellRoll(BlockPos position, UUID id, AttributeType generatingType) {
+    }
+
+    private record CellKey(int x, int z) {
     }
 }
