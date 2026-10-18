@@ -1,6 +1,6 @@
 # Laylines
 
-Laylines is a Minecraft Forge 1.20.6 mod that maps an invisible, seed-deterministic grid of magical lines across the world grid. This mod blends technical network graph logic with environmental phenomena, giving players a brand new way to discover, tap into, and utilize world seed-based magical reserves.
+Laylines is a Minecraft Forge 1.20.6 magic mod that maps an invisible, seed-deterministic grid of magical laylines / vains across the world grid. This mod blends technical network graph logic with environmental phenomena, giving players a brand new way to discover, tap into, and utilize world seed-based magical reserves.
 
 ## 🗺️ Core Architecture & Mechanics
 

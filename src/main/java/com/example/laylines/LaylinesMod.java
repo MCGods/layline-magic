@@ -5,7 +5,9 @@ import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
 import com.example.laylines.event.MiracleGrowthHandler;
-import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
+import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
+import com.example.laylines.network.packet.locatorStick.ClientboundStickReportPacket;
+import com.example.laylines.network.packet.locatorStick.ServerboundStickModeRequestPacket;
 import com.example.laylines.saveddata.LaylinesData;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -130,13 +132,24 @@ public class LaylinesMod {
                                 .networkProtocolVersion(1)
                                 .simpleChannel();
 
-                // Register network packet
+                // Register network packets
                 PACKET_HANDLER.messageBuilder(ClientboundLaylineSyncPacket.class, 0, NetworkDirection.PLAY_TO_CLIENT)
                                 .encoder(ClientboundLaylineSyncPacket::encode)
                                 .decoder(ClientboundLaylineSyncPacket::new)
                                 .consumerMainThread(ClientboundLaylineSyncPacket::handle)
                                 .add();
 
+                PACKET_HANDLER.messageBuilder(ServerboundStickModeRequestPacket.class, 2,
+                                NetworkDirection.PLAY_TO_SERVER)
+                                .encoder(ServerboundStickModeRequestPacket::encode)
+                                .decoder(ServerboundStickModeRequestPacket::new)
+                                .consumerMainThread(ServerboundStickModeRequestPacket::handle)
+                                .add();
+                PACKET_HANDLER.messageBuilder(ClientboundStickReportPacket.class, 1, NetworkDirection.PLAY_TO_CLIENT)
+                                .encoder(ClientboundStickReportPacket::encode)
+                                .decoder(ClientboundStickReportPacket::new)
+                                .consumerMainThread(ClientboundStickReportPacket::handle)
+                                .add();
                 if (Config.logDirtBlock)
                         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
 

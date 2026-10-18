@@ -1,9 +1,9 @@
 package com.example.laylines.render;
 
 import com.example.laylines.LaylinesMod;
+import com.example.laylines.clientdata.ClientLaylineEdge;
 import com.example.laylines.network.LaylineNode.AttributeType;
-import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
-import com.example.laylines.network.packet.LaylineParticleCache;
+import com.example.laylines.network.packet.laylineParticles.LaylineParticleCache;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Minecraft;
@@ -50,8 +50,8 @@ public class LaylineRenderHandler {
                 return;
             }
 
-            for (ClientboundLaylineSyncPacket.EdgeData edge : edges) {
-                renderLayline(event, edge.nodeA(), edge.attributeType(), edge.nodeB(), gameTime);
+            for (ClientLaylineEdge edge : edges) {
+                renderLayline(event, edge.nodeA(), edge.dominantType(), edge.nodeB(), gameTime);
             }
 
             RenderSystem.enableDepthTest();

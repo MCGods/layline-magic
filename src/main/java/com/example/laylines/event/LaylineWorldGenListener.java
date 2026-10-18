@@ -1,5 +1,6 @@
 package com.example.laylines.event;
 
+import com.example.laylines.layout.LaylineLayoutUtil;
 import com.example.laylines.network.LaylineNode;
 import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
@@ -54,16 +55,16 @@ public class LaylineWorldGenListener {
         long seed = serverLevel.getSeed();
         String dimensionId = serverLevel.dimension().location().toString();
 
-        // Calculate the chunk's corresponding 256x256 cell index
+        // Calculate the chunk's corresponding cell index
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
-        int cellX = LaylineGraphUtil.toCell(chunkX * 16); // Chunk is 16 blocks
-        int cellZ = LaylineGraphUtil.toCell(chunkZ * 16);
+        int cellX = LaylineLayoutUtil.chunkToCell(chunkX);
+        int cellZ = LaylineLayoutUtil.chunkToCell(chunkZ);
 
         LaylinesData data = LaylinesData.get(serverLevel.getServer());
 
-        // Check if LaylinesData already contains a node for this cell
-        if (nodeExistsInCell(data, cellX, cellZ)) {
+        // Fast O(1) check if LaylinesData already contains a node for this cell
+        if (data.hasNodeInCell(cellX, cellZ)) {
             return; // Node already exists, do nothing
         }
 
@@ -106,25 +107,6 @@ public class LaylineWorldGenListener {
 
         // Save to LaylinesData
         data.putNode(node);
-    }
-
-    /**
-     * Checks if a node already exists within the bounds of a given cell.
-     */
-    private static boolean nodeExistsInCell(LaylinesData data, int cellX, int cellZ) {
-        int cellMinX = cellX * LaylineGraphUtil.CELL_SIZE;
-        int cellMinZ = cellZ * LaylineGraphUtil.CELL_SIZE;
-        int cellMaxX = cellMinX + LaylineGraphUtil.CELL_SIZE - 1;
-        int cellMaxZ = cellMinZ + LaylineGraphUtil.CELL_SIZE - 1;
-
-        for (LaylineNode node : data.getNodes().values()) {
-            BlockPos pos = node.getPosition();
-            if (pos.getX() >= cellMinX && pos.getX() <= cellMaxX &&
-                    pos.getZ() >= cellMinZ && pos.getZ() <= cellMaxZ) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

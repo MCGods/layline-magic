@@ -1,6 +1,7 @@
 package com.example.laylines.network;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -124,6 +125,51 @@ public class LaylineNode {
         this.position = position;
         this.generatingType = generatingType;
         initAttributePools();
+    }
+
+    /**
+     * Full constructor for later loaders / tests: skip the random roll and
+     * supply the generating type directly ({@code null} = non-generating).
+     */
+    private LaylineNode(UUID id, BlockPos position, AttributeType generatingType,
+            EnumMap<AttributeType, AttributePool> pools) {
+        this.id = id;
+        this.position = position;
+        this.generatingType = generatingType;
+        this.attributes.putAll(pools);
+    }
+
+    public void encode(FriendlyByteBuf buffer) {
+        buffer.writeUUID(id);
+        buffer.writeBlockPos(position);
+        if (generatingType != null) {
+            buffer.writeBoolean(true);
+            buffer.writeEnum(generatingType);
+        } else {
+            buffer.writeBoolean(false);
+        }
+        for (AttributeType type : AttributeType.values()) {
+            AttributePool pool = attributes.get(type);
+            buffer.writeUtf(type.toString());
+            buffer.writeFloat(pool.getCapacity());
+            buffer.writeFloat(pool.getCurrentValue());
+        }
+    }
+
+    public static LaylineNode decode(FriendlyByteBuf buffer) {
+        UUID id = buffer.readUUID();
+        BlockPos position = buffer.readBlockPos();
+        AttributeType genType = buffer.readBoolean() ? buffer.readEnum(AttributeType.class) : null;
+        EnumMap<AttributeType, AttributePool> pools = new EnumMap<>(AttributeType.class);
+        for (int i = 0; i < AttributeType.values().length; i++) {
+            AttributeType typeName = AttributeType.valueOf(buffer.readUtf());
+            float capacity = buffer.readFloat();
+            float currentValue = buffer.readFloat();
+            pools.put(typeName, new AttributePool(capacity, currentValue));
+
+        }
+
+        return new LaylineNode(id, position, genType, pools);
     }
 
     /**

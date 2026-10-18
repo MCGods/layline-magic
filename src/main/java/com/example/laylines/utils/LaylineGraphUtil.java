@@ -1,5 +1,8 @@
 package com.example.laylines.utils;
 
+import com.example.laylines.layout.LaylineFlowGen;
+import com.example.laylines.layout.LaylineLayoutUtil;
+import com.example.laylines.network.LaylineEdge;
 import com.example.laylines.network.LaylineNode;
 import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
@@ -31,17 +34,10 @@ import java.util.UUID;
 public final class LaylineGraphUtil {
 
     /**
-     * Represents a connection between two layline nodes.
-     * Edges form the infinite web that carries energy across the world.
-     */
-    public static record LaylineEdge(BlockPos nodeA, BlockPos nodeB) {
-    }
-
-    /**
      * Block width/depth of one layout cell. A random 0–255 offset inside the
      * cell yields typical neighbor spacing around ~200 blocks radially.
      */
-    public static final int CELL_SIZE = 256;
+    public static final int CELL_SIZE = LaylineLayoutUtil.CELL_SIZE;
 
     private LaylineGraphUtil() {
     }
@@ -147,68 +143,63 @@ public final class LaylineGraphUtil {
      */
     public static BlockPos getDeterministicNodePos(long seed, String dimensionId, int cellX, int cellZ,
             ServerLevel level) {
-        // Check LaylinesData for existing nodes in this cell
+        return getDeterministicNode(seed, dimensionId, cellX, cellZ, level).getPosition();
+    }
+
+    /**
+     * Resolves the complete LaylineNode for a cell. Queries LaylinesData first;
+     * if not yet generated, falls back to a deterministic virtual LaylineNode.
+     */
+    public static LaylineNode getDeterministicNode(long seed, String dimensionId, int cellX, int cellZ,
+            ServerLevel level) {
         LaylinesData data = LaylinesData.get(level.getServer());
-        BlockPos cellPos = positionForCell(seed, dimensionId, cellX, cellZ);
 
-        // Look for a node that falls within this cell's bounds
-        int cellMinX = cellX * CELL_SIZE;
-        int cellMinZ = cellZ * CELL_SIZE;
-        int cellMaxX = cellMinX + CELL_SIZE - 1;
-        int cellMaxZ = cellMinZ + CELL_SIZE - 1;
-
-        for (LaylineNode node : data.getNodes().values()) {
-            BlockPos nodePos = node.getPosition();
-            if (nodePos.getX() >= cellMinX && nodePos.getX() <= cellMaxX &&
-                    nodePos.getZ() >= cellMinZ && nodePos.getZ() <= cellMaxZ) {
-                // Found a node in this cell (could be structure-anchored)
-                return nodePos;
-            }
+        LaylineNode existing = data.getNodeByCell(cellX, cellZ);
+        if (existing != null) {
+            return existing;
         }
 
-        // Fallback to standard seed-offset calculation for ungenerated chunks
-        return cellPos;
+        return createDeterministicNode(seed, dimensionId, cellX, cellZ);
+    }
+
+    /**
+     * Creates a deterministic LaylineNode based on seed math for ungenerated
+     * chunks.
+     */
+    public static LaylineNode createDeterministicNode(long worldSeed, String dimensionId, int cellX, int cellZ) {
+        CellRoll roll = rollCell(worldSeed, dimensionId, cellX, cellZ);
+        return new LaylineNode(roll.id(), roll.position(), roll.generatingType());
     }
 
     /**
      * Generates runtime edges for a cell and its East/South neighbors.
-     *
-     * Calculates the true deterministic positions of the current cell, its East
-     * neighbor
-     * (+1 cellX), and its South neighbor (+1 cellZ) by pulling coordinates from
-     * LaylinesData. If a node hasn't been generated yet (ungenerated chunks), it
-     * temporarily falls back to seed-math prediction for smooth stick reading.
-     * Returns a list of LaylineEdge connections between them, creating a continuous
-     * grid web that bends toward structure-anchored nodes.
-     *
-     * @param seed        World seed
-     * @param dimensionId Dimension identifier
-     * @param cellX       Cell X coordinate
-     * @param cellZ       Cell Z coordinate
-     * @param level       Server level for accessing LaylinesData
-     * @return List of edges originating from this cell
+     * Each edge stores complete LaylineNode endpoints with the first node as
+     * source.
      */
     public static List<LaylineEdge> getEdgesForCell(long seed, String dimensionId, int cellX, int cellZ,
             ServerLevel level) {
         List<LaylineEdge> edges = new ArrayList<>();
 
-        BlockPos currentPos = getDeterministicNodePos(seed, dimensionId, cellX, cellZ, level);
-        BlockPos eastPos = getDeterministicNodePos(seed, dimensionId, cellX + 1, cellZ, level);
-        BlockPos southPos = getDeterministicNodePos(seed, dimensionId, cellX, cellZ + 1, level);
+        LaylineNode currentNode = getDeterministicNode(seed, dimensionId, cellX, cellZ, level);
 
-        // Create edge to East neighbor
-        edges.add(new LaylineEdge(currentPos, eastPos));
+        // Check East neighbor (cellX + 1, cellZ)
+        if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cellX, cellZ, cellX + 1, cellZ)) {
+            LaylineNode eastNode = getDeterministicNode(seed, dimensionId, cellX + 1, cellZ, level);
+            edges.add(LaylineFlowGen.createDirectedEdge(currentNode, eastNode, seed, dimensionId));
+        }
 
-        // Create edge to South neighbor
-        edges.add(new LaylineEdge(currentPos, southPos));
+        // Check South neighbor (cellX, cellZ + 1)
+        if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cellX, cellZ, cellX, cellZ + 1)) {
+            LaylineNode southNode = getDeterministicNode(seed, dimensionId, cellX, cellZ + 1, level);
+            edges.add(LaylineFlowGen.createDirectedEdge(currentNode, southNode, seed, dimensionId));
+        }
 
         return edges;
     }
 
     /**
      * Returns the grid edges connected to nodes generating {@code attribute}.
-     * Each matching node contributes its four adjacent edges; duplicates are
-     * removed when both endpoints generate the same attribute.
+     * Each matching node contributes its connected adjacent edges.
      */
     public static Set<LaylineEdge> getEdgesForAttribute(long seed, String dimensionId,
             AttributeType attribute, LaylinesData data) {
@@ -222,26 +213,38 @@ public final class LaylineGraphUtil {
         for (LaylineNode node : data.getNodesGenerating(attribute)) {
             BlockPos position = node.getPosition();
             CellKey cell = new CellKey(toCell(position.getX()), toCell(position.getZ()));
-            BlockPos current = positionForCell(seed, dimensionId, cell, nodesByCell);
-            BlockPos east = positionForCell(seed, dimensionId, new CellKey(cell.x + 1, cell.z), nodesByCell);
-            BlockPos south = positionForCell(seed, dimensionId, new CellKey(cell.x, cell.z + 1), nodesByCell);
-            BlockPos west = positionForCell(seed, dimensionId, new CellKey(cell.x - 1, cell.z), nodesByCell);
-            BlockPos north = positionForCell(seed, dimensionId, new CellKey(cell.x, cell.z - 1), nodesByCell);
+            LaylineNode current = nodeForCell(seed, dimensionId, cell, nodesByCell);
 
-            edges.add(new LaylineEdge(current, east));
-            edges.add(new LaylineEdge(current, south));
-            edges.add(new LaylineEdge(west, current));
-            edges.add(new LaylineEdge(north, current));
+            // East
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cell.x(), cell.z(), cell.x() + 1, cell.z())) {
+                LaylineNode east = nodeForCell(seed, dimensionId, new CellKey(cell.x() + 1, cell.z()), nodesByCell);
+                edges.add(LaylineFlowGen.createDirectedEdge(current, east, seed, dimensionId));
+            }
+            // South
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cell.x(), cell.z(), cell.x(), cell.z() + 1)) {
+                LaylineNode south = nodeForCell(seed, dimensionId, new CellKey(cell.x(), cell.z() + 1), nodesByCell);
+                edges.add(LaylineFlowGen.createDirectedEdge(current, south, seed, dimensionId));
+            }
+            // West
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cell.x(), cell.z(), cell.x() - 1, cell.z())) {
+                LaylineNode west = nodeForCell(seed, dimensionId, new CellKey(cell.x() - 1, cell.z()), nodesByCell);
+                edges.add(LaylineFlowGen.createDirectedEdge(current, west, seed, dimensionId));
+            }
+            // North
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cell.x(), cell.z(), cell.x(), cell.z() - 1)) {
+                LaylineNode north = nodeForCell(seed, dimensionId, new CellKey(cell.x(), cell.z() - 1), nodesByCell);
+                edges.add(LaylineFlowGen.createDirectedEdge(current, north, seed, dimensionId));
+            }
         }
         return edges;
     }
 
-    private static BlockPos positionForCell(long seed, String dimensionId, CellKey cell,
+    private static LaylineNode nodeForCell(long seed, String dimensionId, CellKey cell,
             Map<CellKey, LaylineNode> nodesByCell) {
         LaylineNode node = nodesByCell.get(cell);
         return node == null
-                ? positionForCell(seed, dimensionId, cell.x, cell.z)
-                : node.getPosition();
+                ? createDeterministicNode(seed, dimensionId, cell.x, cell.z)
+                : node;
     }
 
     /**
@@ -262,28 +265,7 @@ public final class LaylineGraphUtil {
      * @return The closest edge, or null if no edges exist
      */
     public static LaylineEdge findClosestEdge(long seed, String dimensionId, BlockPos playerPos, ServerLevel level) {
-        int cellX = toCell(playerPos.getX());
-        int cellZ = toCell(playerPos.getZ());
-
-        LaylineEdge closestEdge = null;
-        double closestDist = Double.MAX_VALUE;
-
-        // Generate edges for the 3x3 cell grid surrounding the player
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                List<LaylineEdge> cellEdges = getEdgesForCell(seed, dimensionId, cellX + dx, cellZ + dz, level);
-
-                for (LaylineEdge edge : cellEdges) {
-                    double dist = pointToLineSegmentDistance(playerPos, edge.nodeA(), edge.nodeB());
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestEdge = edge;
-                    }
-                }
-            }
-        }
-
-        return closestEdge;
+        return com.example.laylines.api.LaylineGraphApi.getClosestEdge(level, playerPos).orElse(null);
     }
 
     /**

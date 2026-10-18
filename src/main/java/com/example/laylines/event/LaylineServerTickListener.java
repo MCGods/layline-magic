@@ -1,8 +1,13 @@
 package com.example.laylines.event;
 
+import com.example.laylines.LaylinesMod;
+import com.example.laylines.api.LaylineGraphApi;
+import com.example.laylines.clientdata.ClientLaylineEdge;
+import com.example.laylines.network.LaylineEdge;
 import com.example.laylines.network.LaylineNode.AttributeType;
-import com.example.laylines.network.packet.ClientboundLaylineSyncPacket;
-import com.example.laylines.utils.LaylineGraphUtil;
+import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
+
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -59,36 +64,26 @@ public class LaylineServerTickListener {
      * Calculates local 3x3 cell grid edges and sends them to the player.
      */
     private void sendLaylineDataToPlayer(ServerPlayer player) {
-        if (!(player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+        if (!(player.level() instanceof ServerLevel serverLevel)) {
             return;
         }
 
-        long seed = serverLevel.getSeed();
-        String dimensionId = serverLevel.dimension().location().toString();
         net.minecraft.core.BlockPos playerPos = player.blockPosition();
+        List<LaylineEdge> nearbyEdges = LaylineGraphApi.getEdgesNear(
+                serverLevel, playerPos, LaylineGraphApi.DEFAULT_SEARCH_RADIUS, null);
 
-        int cellX = LaylineGraphUtil.toCell(playerPos.getX());
-        int cellZ = LaylineGraphUtil.toCell(playerPos.getZ());
-
-        List<ClientboundLaylineSyncPacket.EdgeData> edges = new ArrayList<>();
-
-        // Generate edges for the 3x3 cell grid surrounding the player
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                List<LaylineGraphUtil.LaylineEdge> cellEdges = LaylineGraphUtil.getEdgesForCell(
-                        seed, dimensionId, cellX + dx, cellZ + dz, serverLevel);
-
-                for (LaylineGraphUtil.LaylineEdge edge : cellEdges) {
-                    // For now, use WATER as a default attribute type
-                    // TODO: Determine actual attribute type from the nodes
-                    edges.add(new ClientboundLaylineSyncPacket.EdgeData(
-                            edge.nodeA(), edge.nodeB(), AttributeType.EARTH));
-                }
-            }
+        List<ClientLaylineEdge> edges = new ArrayList<>();
+        for (LaylineEdge edge : nearbyEdges) {
+            AttributeType type = edge.getGeneratingType() != null ? edge.getGeneratingType() : AttributeType.EARTH;
+            edges.add(new ClientLaylineEdge(
+                    edge.nodeA(),
+                    edge.nodeB(),
+                    type,
+                    ClientLaylineEdge.scaleEnergy(edge.getCurrentEnergy(type))));
         }
 
         // Send packet to player
-        com.example.laylines.LaylinesMod.PACKET_HANDLER.send(new ClientboundLaylineSyncPacket(edges),
+        LaylinesMod.PACKET_HANDLER.send(new ClientboundLaylineSyncPacket(edges),
                 PacketDistributor.PLAYER.with(player));
     }
 }

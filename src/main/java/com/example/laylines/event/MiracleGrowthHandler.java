@@ -1,6 +1,8 @@
 package com.example.laylines.event;
 
 import com.example.laylines.Config;
+import com.example.laylines.api.LaylineGraphApi;
+import com.example.laylines.network.LaylineEdge;
 import com.example.laylines.network.LaylineNode;
 import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
@@ -14,9 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -43,16 +43,9 @@ public class MiracleGrowthHandler {
     }
 
     private static void accelerateCropsAlongEarthEdges(ServerLevel level) {
-        LaylinesData data = LaylinesData.get(level.getServer());
-        Set<LaylineGraphUtil.LaylineEdge> edges = LaylineGraphUtil.getEdgesForAttribute(
-                level.getSeed(), level.dimension().location().toString(), AttributeType.EARTH, data);
+        Set<LaylineEdge> edges = LaylineGraphApi.getEdgesForAttribute(level, AttributeType.EARTH);
         if (edges.isEmpty()) {
             return;
-        }
-
-        Map<BlockPos, LaylineNode> nodesByPosition = new HashMap<>();
-        for (LaylineNode node : data.getNodes().values()) {
-            nodesByPosition.put(node.getPosition(), node);
         }
 
         double radius = Config.getMiracleGrowthRadius();
@@ -61,8 +54,8 @@ public class MiracleGrowthHandler {
         Set<BlockPos> updatedCrops = new HashSet<>();
         boolean consumedEnergy = false;
 
-        for (LaylineGraphUtil.LaylineEdge edge : edges) {
-            if (findEarthEnergyNode(edge, nodesByPosition, earthCost, edge.nodeA()) == null) {
+        for (LaylineEdge edge : edges) {
+            if (findEarthEnergyNode(edge, earthCost, edge.nodeA()) == null) {
                 continue;
             }
 
@@ -72,7 +65,7 @@ public class MiracleGrowthHandler {
                     continue;
                 }
 
-                LaylineNode energyNode = findEarthEnergyNode(edge, nodesByPosition, earthCost, samplePos);
+                LaylineNode energyNode = findEarthEnergyNode(edge, earthCost, samplePos);
                 if (energyNode == null) {
                     break;
                 }
@@ -99,20 +92,14 @@ public class MiracleGrowthHandler {
         }
 
         if (consumedEnergy) {
-            data.markDirty();
+            LaylinesData.get(level.getServer()).markDirty();
         }
     }
 
-    private static LaylineNode findEarthEnergyNode(LaylineGraphUtil.LaylineEdge edge,
-            Map<BlockPos, LaylineNode> nodesByPosition, double earthCost, BlockPos samplePos) {
+    private static LaylineNode findEarthEnergyNode(LaylineEdge edge, double earthCost, BlockPos samplePos) {
         LaylineNode nearest = null;
         double nearestDistance = Double.MAX_VALUE;
-        for (BlockPos endpoint : new BlockPos[] { edge.nodeA(), edge.nodeB() }) {
-            LaylineNode node = nodesByPosition.get(endpoint);
-            if (node == null) {
-                continue;
-            }
-
+        for (LaylineNode node : new LaylineNode[] { edge.source(), edge.target() }) {
             float energy = node.getCurrentValue(AttributeType.EARTH);
             if (energy <= 0.0f || energy < earthCost) {
                 continue;

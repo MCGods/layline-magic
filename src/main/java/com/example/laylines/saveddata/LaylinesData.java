@@ -1,5 +1,6 @@
 package com.example.laylines.saveddata;
 
+import com.example.laylines.layout.LaylineLayoutUtil;
 import com.example.laylines.network.LaylineNode;
 import com.example.laylines.network.LaylineNode.AttributeType;
 
@@ -44,6 +45,7 @@ public class LaylinesData extends SavedData {
     private static final String CURRENT_VALUE_KEY = "currentValue";
 
     private final Map<UUID, LaylineNode> nodes = new HashMap<>();
+    private final Map<Long, LaylineNode> nodesByCell = new HashMap<>();
 
     public static SavedData.Factory<LaylinesData> factory() {
         return new SavedData.Factory<>(LaylinesData::new, LaylinesData::load, DataFixTypes.LEVEL);
@@ -61,7 +63,13 @@ public class LaylinesData extends SavedData {
     }
 
     public LaylinesData(Map<UUID, LaylineNode> nodes) {
-        this.nodes.putAll(nodes);
+        for (LaylineNode node : nodes.values()) {
+            this.nodes.put(node.getId(), node);
+            long cellKey = LaylineLayoutUtil.packCell(
+                    LaylineLayoutUtil.toCell(node.getPosition().getX()),
+                    LaylineLayoutUtil.toCell(node.getPosition().getZ()));
+            this.nodesByCell.put(cellKey, node);
+        }
     }
 
     @Override
@@ -160,13 +168,36 @@ public class LaylinesData extends SavedData {
      */
     public void putNode(LaylineNode node) {
         nodes.put(node.getId(), node);
+        long cellKey = LaylineLayoutUtil.packCell(
+                LaylineLayoutUtil.toCell(node.getPosition().getX()),
+                LaylineLayoutUtil.toCell(node.getPosition().getZ()));
+        nodesByCell.put(cellKey, node);
         setDirty();
     }
 
     public void removeNode(UUID id) {
-        if (nodes.remove(id) != null) {
+        LaylineNode removed = nodes.remove(id);
+        if (removed != null) {
+            long cellKey = LaylineLayoutUtil.packCell(
+                    LaylineLayoutUtil.toCell(removed.getPosition().getX()),
+                    LaylineLayoutUtil.toCell(removed.getPosition().getZ()));
+            nodesByCell.remove(cellKey);
             setDirty();
         }
+    }
+
+    /**
+     * $O(1)$ fast spatial lookup for a node occupying a specific cell.
+     */
+    public LaylineNode getNodeByCell(int cellX, int cellZ) {
+        return nodesByCell.get(LaylineLayoutUtil.packCell(cellX, cellZ));
+    }
+
+    /**
+     * $O(1)$ check if a node is already registered for this cell.
+     */
+    public boolean hasNodeInCell(int cellX, int cellZ) {
+        return nodesByCell.containsKey(LaylineLayoutUtil.packCell(cellX, cellZ));
     }
 
     /** Call after mutating a node that is already in the map. */
