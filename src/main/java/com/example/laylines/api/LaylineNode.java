@@ -1,4 +1,4 @@
-package com.example.laylines.network;
+package com.example.laylines.api;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -191,6 +191,16 @@ public class LaylineNode {
     }
 
     /**
+     * Set the capacity for a specific attribute pool.
+     */
+    public void setCapacity(AttributeType type, float capacity) {
+        AttributePool pool = attributes.get(type);
+        if (pool != null) {
+            pool.setCapacity(capacity);
+        }
+    }
+
+    /**
      * Rate this node currently generates for {@code type}.
      * Only the matching {@link #generatingType} regenerates; everything else is 0.
      */
@@ -234,10 +244,6 @@ public class LaylineNode {
 
     public float getCapacity(AttributeType type) {
         return attributes.get(type).getCapacity();
-    }
-
-    public void setCapacity(AttributeType type, float capacity) {
-        attributes.get(type).setCapacity(capacity);
     }
 
     public float getCurrentValue(AttributeType type) {

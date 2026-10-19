@@ -46,6 +46,20 @@ public final class LaylineLayoutUtil {
     }
 
     /**
+     * Minimum chunk coordinate for a given cell index.
+     */
+    public static int cellMinChunk(int cell) {
+        return cell * (CELL_SIZE / 16);
+    }
+
+    /**
+     * Maximum chunk coordinate for a given cell index (inclusive).
+     */
+    public static int cellMaxChunk(int cell) {
+        return cell * (CELL_SIZE / 16) + (CELL_SIZE / 16) - 1;
+    }
+
+    /**
      * Packs 2D cell coordinates into a 64-bit primitive key for fast hash mapping.
      */
     public static long packCell(int cellX, int cellZ) {

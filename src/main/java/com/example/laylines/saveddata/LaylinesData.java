@@ -1,8 +1,8 @@
 package com.example.laylines.saveddata;
 
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.layout.LaylineLayoutUtil;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;

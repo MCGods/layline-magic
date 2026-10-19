@@ -1,24 +1,26 @@
 package com.example.laylines.clientdata;
 
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Client-side Data Transfer Object (DTO) for a layline edge.
- * Contains only rendering and interaction data; never exposes internal cell coordinates
+ * Contains only rendering and interaction data; never exposes internal cell
+ * coordinates
  * or raw server capacities.
  */
 public record ClientLaylineEdge(
         BlockPos nodeA,
         BlockPos nodeB,
         AttributeType dominantType,
-        int scaledEnergy
-) {
+        int scaledEnergy) {
 
     /**
-     * Scales a server energy pool value to the client range [0, 10] using integer division by 10.
+     * Scales a server energy pool value to the client range [0, 10] using integer
+     * division by 10.
      */
     public static int scaleEnergy(float energy) {
         if (energy <= 0.0f) {

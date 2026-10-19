@@ -1,7 +1,7 @@
 package com.example.laylines.layout;
 
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode;
+import com.example.laylines.api.LaylineEdge;
+import com.example.laylines.api.LaylineNode;
 
 /**
  * Seed-deterministic layline network connectivity and flow generation

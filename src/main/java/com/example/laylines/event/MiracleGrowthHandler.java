@@ -1,10 +1,10 @@
 package com.example.laylines.event;
 
-import com.example.laylines.Config;
+import com.example.laylines.MainConfig;
+import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineGraphApi;
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
 import com.example.laylines.utils.LaylineGraphUtil;
 import net.minecraft.core.BlockPos;
@@ -28,11 +28,11 @@ public class MiracleGrowthHandler {
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !Config.isMiracleGrowthEnabled()) {
+        if (event.phase != TickEvent.Phase.END || !MainConfig.isMiracleGrowthEnabled()) {
             return;
         }
 
-        if (++tickCounter < Config.getMiracleGrowthIntervalSeconds()) {
+        if (++tickCounter < MainConfig.getMiracleGrowthIntervalSeconds()) {
             return;
         }
         tickCounter = 0;
@@ -48,9 +48,9 @@ public class MiracleGrowthHandler {
             return;
         }
 
-        double radius = Config.getMiracleGrowthRadius();
-        double earthCost = Config.getMiracleGrowthEarthCost();
-        int samplesPerEdge = Config.getMiracleGrowthSamplesPerEdge();
+        double radius = MainConfig.getMiracleGrowthRadius();
+        double earthCost = MainConfig.getMiracleGrowthEarthCost();
+        int samplesPerEdge = MainConfig.getMiracleGrowthSamplesPerEdge();
         Set<BlockPos> updatedCrops = new HashSet<>();
         boolean consumedEnergy = false;
 

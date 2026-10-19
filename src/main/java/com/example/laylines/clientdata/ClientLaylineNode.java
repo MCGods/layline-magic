@@ -1,7 +1,5 @@
 package com.example.laylines.clientdata;
 
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 
@@ -9,6 +7,9 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
+
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 
 /**
  * Client-side Data Transfer Object (DTO) for a layline node.
@@ -19,8 +20,7 @@ public record ClientLaylineNode(
         UUID id,
         BlockPos position,
         AttributeType generatingType,
-        Map<AttributeType, Integer> scaledPools
-) {
+        Map<AttributeType, Integer> scaledPools) {
 
     public ClientLaylineNode {
         scaledPools = Collections.unmodifiableMap(new EnumMap<>(scaledPools));

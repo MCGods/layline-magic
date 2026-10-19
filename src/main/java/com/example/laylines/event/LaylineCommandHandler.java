@@ -1,8 +1,8 @@
 package com.example.laylines.event;
 
 import com.example.laylines.api.LaylineGraphApi;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;

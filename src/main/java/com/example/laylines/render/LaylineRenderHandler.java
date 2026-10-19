@@ -1,8 +1,8 @@
 package com.example.laylines.render;
 
 import com.example.laylines.LaylinesMod;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.clientdata.ClientLaylineEdge;
-import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.network.packet.laylineParticles.LaylineParticleCache;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;

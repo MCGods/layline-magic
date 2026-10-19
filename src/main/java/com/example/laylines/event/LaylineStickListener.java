@@ -1,12 +1,12 @@
 package com.example.laylines.event;
 
 import com.example.laylines.LaylinesMod;
+import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineGraphApi;
+import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.StickMode;
 import com.example.laylines.clientdata.ClientLaylineEdge;
 import com.example.laylines.clientdata.LaylineStickClientCache;
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode;
 import com.example.laylines.network.packet.locatorStick.ClientboundStickReportPacket;
 import com.example.laylines.utils.LaylineGraphUtil;
 import com.mojang.logging.LogUtils;

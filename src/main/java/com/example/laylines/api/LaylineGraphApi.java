@@ -1,9 +1,7 @@
 package com.example.laylines.api;
 
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.layout.LaylineLayoutUtil;
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.saveddata.LaylinesData;
 import com.example.laylines.utils.LaylineGraphUtil;
 
@@ -28,22 +26,28 @@ import java.util.UUID;
  */
 public final class LaylineGraphApi {
 
-    /** Default search radius in blocks (~1.5 cells) for local edge proximity lookups. */
+    /**
+     * Default search radius in blocks (~1.5 cells) for local edge proximity
+     * lookups.
+     */
     public static final double DEFAULT_SEARCH_RADIUS = 384.0;
 
     private LaylineGraphApi() {
     }
 
     /**
-     * Finds the closest node to the specified world coordinates, optionally filtering by generating type.
-     * Uses spatial hash lookups across the surrounding cells to avoid full-world scans.
+     * Finds the closest node to the specified world coordinates, optionally
+     * filtering by generating type.
+     * Uses spatial hash lookups across the surrounding cells to avoid full-world
+     * scans.
      *
-     * @param level   The server level
-     * @param pos     World coordinates to search from
-     * @param filter  Optional generating type to filter by (null for any node)
+     * @param level  The server level
+     * @param pos    World coordinates to search from
+     * @param filter Optional generating type to filter by (null for any node)
      * @return The closest node, or empty if none found
      */
-    public static Optional<LaylineNode> getClosestNode(ServerLevel level, BlockPos pos, @Nullable AttributeType filter) {
+    public static Optional<LaylineNode> getClosestNode(ServerLevel level, BlockPos pos,
+            @Nullable AttributeType filter) {
         long seed = level.getSeed();
         String dimensionId = level.dimension().location().toString();
 
@@ -76,46 +80,54 @@ public final class LaylineGraphApi {
     }
 
     /**
-     * Finds the closest node to the specified coordinates without attribute filtering.
+     * Finds the closest node to the specified coordinates without attribute
+     * filtering.
      */
     public static Optional<LaylineNode> getClosestNode(ServerLevel level, BlockPos pos) {
         return getClosestNode(level, pos, null);
     }
 
     /**
-     * Finds the closest node to the center of a chunk, optionally filtering by generating type.
+     * Finds the closest node to the center of a chunk, optionally filtering by
+     * generating type.
      */
-    public static Optional<LaylineNode> getClosestNodeToChunk(ServerLevel level, ChunkPos chunkPos, @Nullable AttributeType filter) {
+    public static Optional<LaylineNode> getClosestNodeToChunk(ServerLevel level, ChunkPos chunkPos,
+            @Nullable AttributeType filter) {
         BlockPos centerPos = chunkPos.getMiddleBlockPosition(LaylineNode.DEFAULT_Y);
         return getClosestNode(level, centerPos, filter);
     }
 
     /**
-     * Finds the closest edge to the specified coordinates, optionally filtering by generating type.
+     * Finds the closest edge to the specified coordinates, optionally filtering by
+     * generating type.
      *
-     * @param level   The server level
-     * @param pos     The position to measure from
-     * @param filter  Optional generating attribute filter
+     * @param level  The server level
+     * @param pos    The position to measure from
+     * @param filter Optional generating attribute filter
      * @return The closest edge, or empty if none exist in the search radius
      */
-    public static Optional<LaylineEdge> getClosestEdge(ServerLevel level, BlockPos pos, @Nullable AttributeType filter) {
+    public static Optional<LaylineEdge> getClosestEdge(ServerLevel level, BlockPos pos,
+            @Nullable AttributeType filter) {
         List<LaylineEdge> candidates = getEdgesNear(level, pos, DEFAULT_SEARCH_RADIUS, filter);
         return candidates.stream()
-                .min(Comparator.comparingDouble(edge ->
-                        LaylineLayoutUtil.pointToLineSegmentDistance(pos, edge.nodeA(), edge.nodeB())));
+                .min(Comparator.comparingDouble(
+                        edge -> LaylineLayoutUtil.pointToLineSegmentDistance(pos, edge.nodeA(), edge.nodeB())));
     }
 
     /**
-     * Finds the closest edge to the specified coordinates without attribute filtering.
+     * Finds the closest edge to the specified coordinates without attribute
+     * filtering.
      */
     public static Optional<LaylineEdge> getClosestEdge(ServerLevel level, BlockPos pos) {
         return getClosestEdge(level, pos, null);
     }
 
     /**
-     * Finds the closest edge to the center of a chunk, optionally filtering by generating type.
+     * Finds the closest edge to the center of a chunk, optionally filtering by
+     * generating type.
      */
-    public static Optional<LaylineEdge> getClosestEdgeToChunk(ServerLevel level, ChunkPos chunkPos, @Nullable AttributeType filter) {
+    public static Optional<LaylineEdge> getClosestEdgeToChunk(ServerLevel level, ChunkPos chunkPos,
+            @Nullable AttributeType filter) {
         BlockPos centerPos = chunkPos.getMiddleBlockPosition(LaylineNode.DEFAULT_Y);
         return getClosestEdge(level, centerPos, filter);
     }
@@ -123,13 +135,14 @@ public final class LaylineGraphApi {
     /**
      * Retrieves all edges within a specified horizontal radius of a world position.
      *
-     * @param level   The server level
-     * @param pos     Center position
-     * @param radius  Maximum horizontal block distance
-     * @param filter  Optional attribute filter
+     * @param level  The server level
+     * @param pos    Center position
+     * @param radius Maximum horizontal block distance
+     * @param filter Optional attribute filter
      * @return List of matching edges
      */
-    public static List<LaylineEdge> getEdgesNear(ServerLevel level, BlockPos pos, double radius, @Nullable AttributeType filter) {
+    public static List<LaylineEdge> getEdgesNear(ServerLevel level, BlockPos pos, double radius,
+            @Nullable AttributeType filter) {
         long seed = level.getSeed();
         String dimensionId = level.dimension().location().toString();
 
@@ -169,7 +182,8 @@ public final class LaylineGraphApi {
     }
 
     /**
-     * Retrieves all edges in the world associated with nodes that generate the given attribute.
+     * Retrieves all edges in the world associated with nodes that generate the
+     * given attribute.
      */
     public static Set<LaylineEdge> getEdgesForAttribute(ServerLevel level, AttributeType attribute) {
         LaylinesData data = LaylinesData.get(level.getServer());
@@ -195,4 +209,3 @@ public final class LaylineGraphApi {
         LaylinesData.get(level.getServer()).putNode(node);
     }
 }
-

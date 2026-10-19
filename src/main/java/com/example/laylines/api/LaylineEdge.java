@@ -1,9 +1,10 @@
-package com.example.laylines.network;
+package com.example.laylines.api;
 
-import com.example.laylines.network.LaylineNode.AttributeType;
 import net.minecraft.core.BlockPos;
 
 import java.util.Objects;
+
+import com.example.laylines.api.LaylineNode.AttributeType;
 
 /**
  * Server-side representation of an edge in the layline network.
@@ -54,4 +55,3 @@ public record LaylineEdge(LaylineNode source, LaylineNode target) {
         return source.getCurrentValue(type);
     }
 }
-

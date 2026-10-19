@@ -1,9 +1,9 @@
 package com.example.laylines.network.packet.locatorStick;
 
+import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.StickMode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.clientdata.ClientLaylineEdge;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;

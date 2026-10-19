@@ -1,10 +1,11 @@
 package com.example.laylines.utils;
 
+import com.example.laylines.api.LaylineEdge;
+import com.example.laylines.api.LaylineNode;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.layout.LaylineFlowGen;
 import com.example.laylines.layout.LaylineLayoutUtil;
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
+import com.example.laylines.layout.StructureAnchorResolver;
 import com.example.laylines.saveddata.LaylinesData;
 
 import net.minecraft.core.BlockPos;
@@ -157,6 +158,11 @@ public final class LaylineGraphUtil {
         LaylineNode existing = data.getNodeByCell(cellX, cellZ);
         if (existing != null) {
             return existing;
+        }
+
+        java.util.Optional<LaylineNode> anchorOpt = StructureAnchorResolver.resolve(cellX, cellZ, level);
+        if (anchorOpt.isPresent()) {
+            return anchorOpt.get();
         }
 
         return createDeterministicNode(seed, dimensionId, cellX, cellZ);

@@ -1,49 +1,35 @@
 package com.example.laylines.event;
 
+import com.example.laylines.api.LaylineNode;
 import com.example.laylines.layout.LaylineLayoutUtil;
-import com.example.laylines.network.LaylineNode;
-import com.example.laylines.network.LaylineNode.AttributeType;
+import com.example.laylines.layout.StructureAnchorResolver;
 import com.example.laylines.saveddata.LaylinesData;
 import com.example.laylines.utils.LaylineGraphUtil;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.levelgen.structure.Structure;
-import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 import java.util.Optional;
-import java.util.Random;
-import java.util.UUID;
 
 /**
- * World generation listener for automated layline node spawning (README Section
- * 2).
+ * World generation listener for automated layline node spawning.
  *
  * Implements a clean, unified database model:
  * - Every visited node is physically instantiated and saved to LaylinesData
  * during chunk generation
- * - Structure-First Rule: Desert Temples get custom anchored nodes with
- * weighted generation
+ * - Structure-First Rule: Registered structure anchors claim node generation
+ * within the cell based on rule priority
  * - Standard Fallback: Other cells use seed-offset math with standard 50%
  * generation chance
  */
 public class LaylineWorldGenListener {
 
-    /** Structure resource key for Desert Temples */
-    private static final ResourceKey<Structure> DESERT_PYRAMID_KEY = ResourceKey.create(Registries.STRUCTURE,
-            new ResourceLocation("desert_pyramid"));
-
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
-        // Only process on server side
-        if (event.getLevel().isClientSide()) {
+        // Only process for new chunks. This can only be true server side
+        if (!event.isNewChunk()) {
             return;
         }
 
@@ -68,56 +54,19 @@ public class LaylineWorldGenListener {
             return; // Node already exists, do nothing
         }
 
-        // Look up the Desert Temple structure from the registry
-        Optional<Holder.Reference<Structure>> structureHolder = serverLevel.registryAccess()
-                .registryOrThrow(Registries.STRUCTURE)
-                .getHolder(DESERT_PYRAMID_KEY);
-
-        boolean hasTemple = false;
-        BlockPos templePos = null;
-
-        if (structureHolder.isPresent()) {
-            // Check if this chunk contains a Desert Temple
-            StructureStart structureStart = chunk.getStartForStructure(structureHolder.get().value());
-            if (structureStart != null && structureStart.isValid()) {
-                // Get the structure's bounding box and calculate center
-                templePos = structureStart.getBoundingBox().getCenter();
-                if (templePos != null) {
-                    hasTemple = true;
-                }
-            }
-        }
-
+        // Resolve any registered structure anchor for this cell using the extensible
+        // framework. The resolver returns a fully‑initialized LaylineNode if a
+        // structure anchor is found.
+        Optional<LaylineNode> nodeOpt = StructureAnchorResolver.resolve(cellX, cellZ, serverLevel);
         LaylineNode node;
-
-        if (hasTemple) {
-            // Structure-First Rule: Create node anchored to temple center
-            // Use weighted generation: 90% FIRE, 10% DARK
-            AttributeType generatingType = rollDesertTempleType(new Random(seed + cellX * 31L + cellZ));
-            BlockPos nodePos = new BlockPos(
-                    templePos.getX(),
-                    templePos.getY() != 0 ? templePos.getY() : LaylineNode.DEFAULT_Y,
-                    templePos.getZ());
-            node = new LaylineNode(UUID.randomUUID(), nodePos, generatingType);
+        if (nodeOpt.isPresent()) {
+            node = nodeOpt.get();
         } else {
-            // Standard Fallback: Use seed-offset math with standard 50% generation chance
-            BlockPos cellPos = LaylineGraphUtil.positionForCell(seed, dimensionId, cellX, cellZ);
-            node = new LaylineNode(cellPos);
+            // Fallback: standard seed‑offset deterministic node
+            node = LaylineGraphUtil.createDeterministicNode(seed, dimensionId, cellX, cellZ);
         }
 
         // Save to LaylinesData
         data.putNode(node);
-    }
-
-    /**
-     * Weighted generation for Desert Temple structures:
-     * - 90% chance to be FIRE
-     * - 10% chance to be DARK
-     */
-    private static AttributeType rollDesertTempleType(Random random) {
-        if (random.nextFloat() < 0.9f) {
-            return AttributeType.FIRE;
-        }
-        return AttributeType.DARK;
     }
 }

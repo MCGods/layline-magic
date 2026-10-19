@@ -1,10 +1,10 @@
 package com.example.laylines.event;
 
 import com.example.laylines.LaylinesMod;
+import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineGraphApi;
+import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.clientdata.ClientLaylineEdge;
-import com.example.laylines.network.LaylineEdge;
-import com.example.laylines.network.LaylineNode.AttributeType;
 import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
 
 import net.minecraft.server.level.ServerLevel;
