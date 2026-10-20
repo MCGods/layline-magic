@@ -74,6 +74,9 @@ public class MainConfig {
         private static final ForgeConfigSpec.BooleanValue MIRACLE_GROWTH_ENABLED = BUILDER
                         .comment("Whether Miracle Growth phenomenon is enabled.")
                         .define("phenomena.miracleGrowth.enabled", true);
+        private static final ForgeConfigSpec.BooleanValue CURSED_NIGHT_ENABLED = BUILDER
+                        .comment("Whether Cursed Night phenomenon is enabled.")
+                        .define("phenomena.cursedNight.enabled", true);
 
         private static List<? extends Config> createDefaultPhenomenaRules() {
                 List<Config> list = new ArrayList<>();
@@ -352,6 +355,10 @@ public class MainConfig {
         private static boolean validateItemName(final Object obj) {
                 return obj instanceof final String itemName
                                 && ForgeRegistries.ITEMS.containsKey(new ResourceLocation(itemName));
+        }
+
+        public static boolean isCursedNightEnabled() {
+                return CURSED_NIGHT_ENABLED.get();
         }
 
 }

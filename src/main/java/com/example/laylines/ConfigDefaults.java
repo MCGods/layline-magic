@@ -8,6 +8,7 @@ import com.example.laylines.api.IntRange;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.StructureAnchorRule;
 import com.example.laylines.api.phenomena.PhenomenaRule;
+import com.example.laylines.event.phenomena.CursedNightPhenomenon;
 import com.example.laylines.event.phenomena.MiracleGrowthPhenomenon;
 
 import net.minecraft.resources.ResourceLocation;
@@ -27,5 +28,6 @@ public class ConfigDefaults {
                                                         LaylineNode.AttributeType.DARK, new IntRange(60, 120))));
 
         public static final Map<ResourceLocation, PhenomenaRule> PHENOMENA_RULES_DEFAULTS = Map.of(
-                        MiracleGrowthPhenomenon.ID, MiracleGrowthPhenomenon.getDefaultRule());
+                        MiracleGrowthPhenomenon.ID, MiracleGrowthPhenomenon.getDefaultRule(),
+                        CursedNightPhenomenon.ID, CursedNightPhenomenon.getDefaultRule());
 }

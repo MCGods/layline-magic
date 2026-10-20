@@ -5,6 +5,7 @@ import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
 import com.example.laylines.api.phenomena.PhenomenaRegistry;
+import com.example.laylines.event.phenomena.CursedNightPhenomenon;
 import com.example.laylines.event.phenomena.MiracleGrowthPhenomenon;
 import com.example.laylines.event.phenomena.PhenomenaManager;
 import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
@@ -129,6 +130,7 @@ public class LaylinesMod {
 
                 // Register default phenomena
                 PhenomenaRegistry.register(new MiracleGrowthPhenomenon());
+                PhenomenaRegistry.register(new CursedNightPhenomenon());
 
                 // Initialize network channel
                 PACKET_HANDLER = ChannelBuilder

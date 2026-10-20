@@ -38,13 +38,9 @@ public class MiracleGrowthPhenomenon extends LaylinePhenomenon {
 
     public static final ResourceLocation ID = new ResourceLocation(LaylinesMod.MODID, "miracle_growth");
 
-    private static final PhenomenaRule DEFAULT_RULE;
-
-    static {
-        Map<AttributeType, Float> cost = new EnumMap<>(AttributeType.class);
-        cost.put(AttributeType.EARTH, 5.0f);
-        DEFAULT_RULE = new PhenomenaRule(cost, 10.0, 1.0, 8);
-    }
+    private static final PhenomenaRule DEFAULT_RULE = new PhenomenaRule(
+            Map.of(AttributeType.EARTH, 5.0f),
+            10.0, 1.0, 8);
 
     public static PhenomenaRule getDefaultRule() {
         return DEFAULT_RULE;
