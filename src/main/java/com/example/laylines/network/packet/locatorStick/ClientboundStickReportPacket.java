@@ -114,7 +114,7 @@ public class ClientboundStickReportPacket {
         AttributeType generating = node.getGeneratingType();
         List<String> lines = new ArrayList<>();
         lines.add("=== Layline Node ===");
-        // lines.add("UUID: " + node.getId());
+        lines.add("UUID: " + node.getId());
         // lines.add("Pos: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
         lines.add("Pools:");
         for (AttributeType type : AttributeType.values()) {

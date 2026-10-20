@@ -13,6 +13,7 @@ import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -23,6 +24,8 @@ import com.example.laylines.api.IntRange;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.StructureAnchorRegistry;
 import com.example.laylines.api.StructureAnchorRule;
+import com.example.laylines.api.phenomena.PhenomenaRegistry;
+import com.example.laylines.api.phenomena.PhenomenaRule;
 import com.mojang.logging.LogUtils;
 
 @Mod.EventBusSubscriber(modid = LaylinesMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -59,35 +62,55 @@ public class MainConfig {
                                         obj -> obj instanceof com.electronwill.nightconfig.core.UnmodifiableConfig
                                                         || obj instanceof Map);
 
+        // General Phenomena Config
+        private static final ForgeConfigSpec.IntValue PHENOMENA_EVALUATION_FREQUENCY = BUILDER
+                        .comment("Tick frequency to evaluate phenomena on loaded edges (default: 2 ticks).")
+                        .defineInRange("phenomena.evaluationFrequencyTicks", 2, 1, 72000);
+
+        private static final ForgeConfigSpec.IntValue PHENOMENA_EVALUATE_EDGE_COUNT = BUILDER
+                        .comment("Number of random loaded edges picked for evaluation each interval (default: 4).")
+                        .defineInRange("phenomena.evaluateEdgeCount", 4, 1, 64);
+
         private static final ForgeConfigSpec.BooleanValue MIRACLE_GROWTH_ENABLED = BUILDER
-                        .comment("Whether Earth laylines accelerate nearby crops.")
-                        .define("miracleGrowth.enabled", true);
+                        .comment("Whether Miracle Growth phenomenon is enabled.")
+                        .define("phenomena.miracleGrowth.enabled", true);
 
-        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_INTERVAL_TICKS = BUILDER
-                        .comment("Seconds between miracle growth pulses.")
-                        .defineInRange("miracleGrowth.intervalTicks", 60, 1, 72000);
+        private static List<? extends Config> createDefaultPhenomenaRules() {
+                List<Config> list = new ArrayList<>();
+                for (Map.Entry<ResourceLocation, PhenomenaRule> entry : ConfigDefaults.PHENOMENA_RULES_DEFAULTS
+                                .entrySet()) {
+                        Config table = Config.inMemory();
+                        table.set("phenomenon", entry.getKey().toString());
+                        table.set("range", entry.getValue().range());
+                        table.set("chance", entry.getValue().chance());
+                        table.set("strength", entry.getValue().strength());
 
-        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_RADIUS = BUILDER
-                        .comment("Maximum horizontal distance in blocks from an Earth layline edge.")
-                        .defineInRange("miracleGrowth.radius", 10, 1, 64);
+                        Config cost = Config.inMemory();
+                        entry.getValue().cost().forEach((attr, weight) -> cost.set(attr.name(), weight.doubleValue()));
+                        table.set("cost", cost);
 
-        private static final ForgeConfigSpec.DoubleValue MIRACLE_GROWTH_EARTH_COST = BUILDER
-                        .comment("Earth energy consumed for each crop accelerated.")
-                        .defineInRange("miracleGrowth.earthCostPerCrop", 5.0, 0.0, 100.0);
+                        list.add(table);
+                }
+                return list;
+        }
 
-        private static final ForgeConfigSpec.IntValue MIRACLE_GROWTH_SAMPLES_PER_EDGE = BUILDER
-                        .comment("Random crop locations tested along each energized Earth edge per pulse.")
-                        .defineInRange("miracleGrowth.samplesPerEdge", 8, 1, 128);
+        private static final ForgeConfigSpec.ConfigValue<List<? extends Config>> PHENOMENA_RULES = BUILDER
+                        .comment("Phenomena rules. Use TOML table syntax, e.g.:\n[[phenomena_rules]]\nphenomenon = \"laylines:miracle_growth\"\nrange = 10.0\nchance = 1.0\nstrength = 8\n[phenomena_rules.cost]\nEARTH = 5.0\n\nAdd additional [[phenomena_rules]] tables for other phenomena.")
+                        .defineListAllowEmpty("phenomena_rules",
+                                        createDefaultPhenomenaRules(),
+                                        obj -> obj instanceof UnmodifiableConfig || obj instanceof Map);
 
         static final ForgeConfigSpec SPEC = BUILDER.build();
 
         private static volatile List<StructureAnchorRule> cachedRules = null;
+        private static volatile Map<ResourceLocation, PhenomenaRule> cachedPhenomenaRules = null;
 
         @SubscribeEvent
         public static void onConfigLoad(final ModConfigEvent event) {
                 if (event.getConfig().getSpec() == SPEC) {
                         refreshRules();
-                        LOGGER.info("Laylines config loaded. {} anchor rules active.", cachedRules.size());
+                        LOGGER.info("Laylines config loaded. {} anchor rules, {} phenomena rules active.",
+                                        cachedRules.size(), cachedPhenomenaRules.size());
                 }
         }
 
@@ -120,6 +143,38 @@ public class MainConfig {
                         cachedRules = Collections.unmodifiableList(rules);
                 }
                 StructureAnchorRegistry.reloadFromConfig(cachedRules);
+                refreshPhenomenaRules();
+        }
+
+        public static Map<ResourceLocation, PhenomenaRule> getPhenomenaRules() {
+                if (cachedPhenomenaRules == null) {
+                        refreshPhenomenaRules();
+                }
+                return cachedPhenomenaRules;
+        }
+
+        public static synchronized void refreshPhenomenaRules() {
+                Map<ResourceLocation, PhenomenaRule> rules = new HashMap<>();
+                try {
+                        List<? extends Config> rawList = PHENOMENA_RULES.get();
+                        if (rawList != null) {
+                                for (Object obj : rawList) {
+                                        Map.Entry<ResourceLocation, PhenomenaRule> entry = parsePhenomenaRule(obj);
+                                        if (entry != null) {
+                                                rules.put(entry.getKey(), entry.getValue());
+                                        }
+                                }
+                        }
+                } catch (Exception e) {
+                        // Config spec may not be loaded yet
+                }
+
+                if (rules.isEmpty()) {
+                        cachedPhenomenaRules = ConfigDefaults.PHENOMENA_RULES_DEFAULTS;
+                } else {
+                        cachedPhenomenaRules = Collections.unmodifiableMap(rules);
+                }
+                PhenomenaRegistry.reloadFromConfig(cachedPhenomenaRules);
         }
 
         private static StructureAnchorRule parseRule(Object obj) {
@@ -219,24 +274,79 @@ public class MainConfig {
                 return null;
         }
 
+        private static Map.Entry<ResourceLocation, PhenomenaRule> parsePhenomenaRule(Object obj) {
+                if (obj instanceof UnmodifiableConfig table) {
+                        String phenomStr = table.get("phenomenon");
+                        if (phenomStr == null || phenomStr.isBlank()) {
+                                return null;
+                        }
+                        ResourceLocation id = new ResourceLocation(phenomStr);
+                        Number rangeNum = table.get("range");
+                        double range = rangeNum != null ? rangeNum.doubleValue() : 10.0;
+                        Number chanceNum = table.get("chance");
+                        double chance = chanceNum != null ? chanceNum.doubleValue() : 1.0;
+                        Number strengthNum = table.get("strength");
+                        int strength = strengthNum != null ? strengthNum.intValue() : 8;
+
+                        Map<LaylineNode.AttributeType, Float> cost = new EnumMap<>(LaylineNode.AttributeType.class);
+                        Object rawCost = table.get("cost");
+                        if (rawCost instanceof UnmodifiableConfig costConfig) {
+                                for (UnmodifiableConfig.Entry entry : costConfig.entrySet()) {
+                                        try {
+                                                LaylineNode.AttributeType type = LaylineNode.AttributeType
+                                                                .valueOf(entry.getKey().toUpperCase(Locale.ROOT));
+                                                if (entry.getValue() instanceof Number n) {
+                                                        cost.put(type, n.floatValue());
+                                                }
+                                        } catch (IllegalArgumentException ignored) {
+                                        }
+                                }
+                        }
+
+                        return Map.entry(id, new PhenomenaRule(cost, range, chance, strength));
+                } else if (obj instanceof Map<?, ?> map) {
+                        Object phenomVal = map.get("phenomenon");
+                        if (phenomVal == null)
+                                return null;
+                        ResourceLocation id = new ResourceLocation(phenomVal.toString());
+
+                        Object rangeVal = map.get("range");
+                        double range = rangeVal instanceof Number n ? n.doubleValue() : 10.0;
+                        Object chanceVal = map.get("chance");
+                        double chance = chanceVal instanceof Number n ? n.doubleValue() : 1.0;
+                        Object strengthVal = map.get("strength");
+                        int strength = strengthVal instanceof Number n ? n.intValue() : 8;
+
+                        Map<LaylineNode.AttributeType, Float> cost = new EnumMap<>(LaylineNode.AttributeType.class);
+                        Object rawCost = map.get("cost");
+                        if (rawCost instanceof Map<?, ?> costMap) {
+                                for (Map.Entry<?, ?> entry : costMap.entrySet()) {
+                                        try {
+                                                LaylineNode.AttributeType type = LaylineNode.AttributeType.valueOf(
+                                                                entry.getKey().toString().toUpperCase(Locale.ROOT));
+                                                if (entry.getValue() instanceof Number n) {
+                                                        cost.put(type, n.floatValue());
+                                                }
+                                        } catch (IllegalArgumentException ignored) {
+                                        }
+                                }
+                        }
+
+                        return Map.entry(id, new PhenomenaRule(cost, range, chance, strength));
+                }
+                return null;
+        }
+
+        public static int getPhenomenaEvaluationFrequencyTicks() {
+                return PHENOMENA_EVALUATION_FREQUENCY.get();
+        }
+
+        public static int getPhenomenaEvaluateEdgeCount() {
+                return PHENOMENA_EVALUATE_EDGE_COUNT.get();
+        }
+
         public static boolean isMiracleGrowthEnabled() {
                 return MIRACLE_GROWTH_ENABLED.get();
-        }
-
-        public static int getMiracleGrowthIntervalSeconds() {
-                return MIRACLE_GROWTH_INTERVAL_TICKS.get() * 20;
-        }
-
-        public static int getMiracleGrowthRadius() {
-                return MIRACLE_GROWTH_RADIUS.get();
-        }
-
-        public static double getMiracleGrowthEarthCost() {
-                return MIRACLE_GROWTH_EARTH_COST.get();
-        }
-
-        public static int getMiracleGrowthSamplesPerEdge() {
-                return MIRACLE_GROWTH_SAMPLES_PER_EDGE.get();
         }
 
         private static boolean validateItemName(final Object obj) {

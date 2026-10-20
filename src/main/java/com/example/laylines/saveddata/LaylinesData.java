@@ -13,12 +13,17 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.server.level.ServerLevel;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Global overworld SavedData for the layline web.
@@ -46,6 +51,8 @@ public class LaylinesData extends SavedData {
 
     private final Map<UUID, LaylineNode> nodes = new HashMap<>();
     private final Map<Long, LaylineNode> nodesByCell = new HashMap<>();
+    private final Map<Long, LaylineNode> nodesByChunk = new HashMap<>();
+    private final Set<LaylineNode> loadedNodes = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public static SavedData.Factory<LaylinesData> factory() {
         return new SavedData.Factory<>(LaylinesData::new, LaylinesData::load, DataFixTypes.LEVEL);
@@ -69,6 +76,8 @@ public class LaylinesData extends SavedData {
                     LaylineLayoutUtil.toCell(node.getPosition().getX()),
                     LaylineLayoutUtil.toCell(node.getPosition().getZ()));
             this.nodesByCell.put(cellKey, node);
+            long chunkKey = ChunkPos.asLong(node.getPosition().getX() >> 4, node.getPosition().getZ() >> 4);
+            this.nodesByChunk.put(chunkKey, node);
         }
     }
 
@@ -172,6 +181,9 @@ public class LaylinesData extends SavedData {
                 LaylineLayoutUtil.toCell(node.getPosition().getX()),
                 LaylineLayoutUtil.toCell(node.getPosition().getZ()));
         nodesByCell.put(cellKey, node);
+        long chunkKey = ChunkPos.asLong(node.getPosition().getX() >> 4, node.getPosition().getZ() >> 4);
+        nodesByChunk.put(chunkKey, node);
+        loadedNodes.add(node);
         setDirty();
     }
 
@@ -182,7 +194,63 @@ public class LaylinesData extends SavedData {
                     LaylineLayoutUtil.toCell(removed.getPosition().getX()),
                     LaylineLayoutUtil.toCell(removed.getPosition().getZ()));
             nodesByCell.remove(cellKey);
+            long chunkKey = ChunkPos.asLong(removed.getPosition().getX() >> 4, removed.getPosition().getZ() >> 4);
+            nodesByChunk.remove(chunkKey);
+            loadedNodes.remove(removed);
             setDirty();
+        }
+    }
+
+    /**
+     * Returns the live set of nodes currently residing in loaded chunks.
+     */
+    public Set<LaylineNode> getLoadedNodes() {
+        return Collections.unmodifiableSet(loadedNodes);
+    }
+
+    /**
+     * Checks if a specific node is currently in a loaded chunk.
+     */
+    public boolean isNodeLoaded(LaylineNode node) {
+        return loadedNodes.contains(node);
+    }
+
+    /**
+     * Called when a chunk is loaded to update the active loadedNodes cache.
+     */
+    public void onChunkLoaded(int chunkX, int chunkZ) {
+        long chunkKey = ChunkPos.asLong(chunkX, chunkZ);
+        LaylineNode node = nodesByChunk.get(chunkKey);
+        if (node != null) {
+            loadedNodes.add(node);
+        }
+    }
+
+    /**
+     * Called when a chunk is unloaded to update the active loadedNodes cache.
+     */
+    public void onChunkUnloaded(int chunkX, int chunkZ) {
+        long chunkKey = ChunkPos.asLong(chunkX, chunkZ);
+        LaylineNode node = nodesByChunk.get(chunkKey);
+        if (node != null) {
+            loadedNodes.remove(node);
+        }
+    }
+
+    /**
+     * Synchronizes the loadedNodes cache against the level's currently loaded
+     * chunks.
+     */
+    public void syncLoadedNodes(ServerLevel level) {
+        for (Map.Entry<Long, LaylineNode> entry : nodesByChunk.entrySet()) {
+            long key = entry.getKey();
+            int cx = ChunkPos.getX(key);
+            int cz = ChunkPos.getZ(key);
+            if (level.getChunkSource().hasChunk(cx, cz)) {
+                loadedNodes.add(entry.getValue());
+            } else {
+                loadedNodes.remove(entry.getValue());
+            }
         }
     }
 

@@ -4,7 +4,9 @@ import com.example.laylines.event.LaylineCommandHandler;
 import com.example.laylines.event.LaylineServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
-import com.example.laylines.event.MiracleGrowthHandler;
+import com.example.laylines.api.phenomena.PhenomenaRegistry;
+import com.example.laylines.event.phenomena.MiracleGrowthPhenomenon;
+import com.example.laylines.event.phenomena.PhenomenaManager;
 import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
 import com.example.laylines.network.packet.locatorStick.ClientboundStickReportPacket;
 import com.example.laylines.network.packet.locatorStick.ServerboundStickModeRequestPacket;
@@ -19,7 +21,6 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.api.distmarker.Dist;
@@ -112,7 +113,7 @@ public class LaylinesMod {
                 MinecraftForge.EVENT_BUS.register(new LaylineCommandHandler());
                 MinecraftForge.EVENT_BUS.register(new LaylineWorldGenListener());
                 MinecraftForge.EVENT_BUS.register(new LaylineServerTickListener());
-                MinecraftForge.EVENT_BUS.register(new MiracleGrowthHandler());
+                MinecraftForge.EVENT_BUS.register(new PhenomenaManager());
 
                 // Register the item to a creative tab
                 modEventBus.addListener(this::addCreative);
@@ -125,6 +126,9 @@ public class LaylinesMod {
         private void commonSetup(final FMLCommonSetupEvent event) {
                 // Some common setup code
                 LOGGER.info("HELLO FROM COMMON SETUP");
+
+                // Register default phenomena
+                PhenomenaRegistry.register(new MiracleGrowthPhenomenon());
 
                 // Initialize network channel
                 PACKET_HANDLER = ChannelBuilder

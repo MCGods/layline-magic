@@ -28,6 +28,11 @@ public class LaylineWorldGenListener {
 
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            LaylinesData data = LaylinesData.get(serverLevel.getServer());
+            data.onChunkLoaded(event.getChunk().getPos().x, event.getChunk().getPos().z);
+        }
+
         // Only process for new chunks. This can only be true server side
         if (!event.isNewChunk()) {
             return;
@@ -68,5 +73,13 @@ public class LaylineWorldGenListener {
 
         // Save to LaylinesData
         data.putNode(node);
+    }
+
+    @SubscribeEvent
+    public void onChunkUnload(ChunkEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            LaylinesData data = LaylinesData.get(serverLevel.getServer());
+            data.onChunkUnloaded(event.getChunk().getPos().x, event.getChunk().getPos().z);
+        }
     }
 }

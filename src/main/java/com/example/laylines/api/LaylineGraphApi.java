@@ -1,6 +1,7 @@
 package com.example.laylines.api;
 
 import com.example.laylines.api.LaylineNode.AttributeType;
+import com.example.laylines.layout.LaylineFlowGen;
 import com.example.laylines.layout.LaylineLayoutUtil;
 import com.example.laylines.saveddata.LaylinesData;
 import com.example.laylines.utils.LaylineGraphUtil;
@@ -203,9 +204,61 @@ public final class LaylineGraphApi {
     }
 
     /**
+     * Returns the live set of nodes currently residing in loaded chunks.
+     */
+    public static Set<LaylineNode> getLoadedNodes(ServerLevel level) {
+        LaylinesData data = LaylinesData.get(level.getServer());
+
+        return data.getLoadedNodes();
+    }
+
+    /**
      * Registers a new or modified node into the world's saved data.
      */
     public static void putNode(ServerLevel level, LaylineNode node) {
         LaylinesData.get(level.getServer()).putNode(node);
+    }
+
+    /**
+     * Retrieves all layline edges where at least one endpoint node resides within a
+     * loaded chunk.
+     */
+    public static List<LaylineEdge> getLoadedEdges(ServerLevel level) {
+        LaylinesData data = LaylinesData.get(level.getServer());
+        Set<LaylineNode> loadedNodes = data.getLoadedNodes();
+        if (loadedNodes.isEmpty()) {
+            data.syncLoadedNodes(level);
+            loadedNodes = data.getLoadedNodes();
+        }
+
+        if (loadedNodes.isEmpty()) {
+            return List.of();
+        }
+
+        long seed = level.getSeed();
+        String dimensionId = level.dimension().location().toString();
+        Set<LaylineEdge> result = new HashSet<>();
+
+        for (LaylineNode node : loadedNodes) {
+            int cx = LaylineLayoutUtil.toCell(node.getPosition().getX());
+            int cz = LaylineLayoutUtil.toCell(node.getPosition().getZ());
+
+            // East & South incident edges
+            result.addAll(LaylineGraphUtil.getEdgesForCell(seed, dimensionId, cx, cz, level));
+
+            // West neighbor incident edge
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cx - 1, cz, cx, cz)) {
+                LaylineNode west = LaylineGraphUtil.getDeterministicNode(seed, dimensionId, cx - 1, cz, level);
+                result.add(LaylineFlowGen.createDirectedEdge(west, node, seed, dimensionId));
+            }
+
+            // North neighbor incident edge
+            if (LaylineFlowGen.isEdgeConnected(seed, dimensionId, cx, cz - 1, cx, cz)) {
+                LaylineNode north = LaylineGraphUtil.getDeterministicNode(seed, dimensionId, cx, cz - 1, level);
+                result.add(LaylineFlowGen.createDirectedEdge(north, node, seed, dimensionId));
+            }
+        }
+
+        return new ArrayList<>(result);
     }
 }

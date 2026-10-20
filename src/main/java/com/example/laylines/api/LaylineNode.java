@@ -5,6 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
@@ -259,6 +260,21 @@ public class LaylineNode {
      */
     public Map<AttributeType, AttributePool> getAttributes() {
         return Map.copyOf(attributes);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        LaylineNode that = (LaylineNode) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
     }
 
     @Override
