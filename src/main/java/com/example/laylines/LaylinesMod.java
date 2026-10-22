@@ -1,7 +1,7 @@
 package com.example.laylines;
 
 import com.example.laylines.event.LaylineCommandHandler;
-import com.example.laylines.event.LaylineServerTickListener;
+import com.example.laylines.event.GoldenSightServerTickListener;
 import com.example.laylines.event.LaylineStickListener;
 import com.example.laylines.event.LaylineWorldGenListener;
 import com.example.laylines.api.phenomena.PhenomenaRegistry;
@@ -113,7 +113,8 @@ public class LaylinesMod {
                 MinecraftForge.EVENT_BUS.register(new LaylineStickListener());
                 MinecraftForge.EVENT_BUS.register(new LaylineCommandHandler());
                 MinecraftForge.EVENT_BUS.register(new LaylineWorldGenListener());
-                MinecraftForge.EVENT_BUS.register(new LaylineServerTickListener());
+                MinecraftForge.EVENT_BUS.register(new GoldenSightServerTickListener());
+                MinecraftForge.EVENT_BUS.register(new com.example.laylines.event.EnergyFlowServerTickListener());
                 MinecraftForge.EVENT_BUS.register(new PhenomenaManager());
 
                 // Register the item to a creative tab

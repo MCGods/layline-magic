@@ -52,6 +52,6 @@ public record LaylineEdge(LaylineNode source, LaylineNode target) {
      * Energy available from the source node for this attribute.
      */
     public float getCurrentEnergy(AttributeType type) {
-        return source.getCurrentValue(type);
+        return type == null ? 0.0f : source.getCurrentValue(type);
     }
 }

@@ -24,7 +24,7 @@ import java.util.List;
  * Every 20 ticks (1 second), checks if players are wearing a Gold Helmet
  * and sends them the local layline edge data for particle rendering.
  */
-public class LaylineServerTickListener {
+public class GoldenSightServerTickListener {
 
     private static int tickCounter = 0;
     private static final int TICK_INTERVAL = 20; // Update once per second
@@ -74,6 +74,7 @@ public class LaylineServerTickListener {
 
         List<ClientLaylineEdge> edges = new ArrayList<>();
         for (LaylineEdge edge : nearbyEdges) {
+            // TODO: Remove, currently packets cannot be null
             AttributeType type = edge.getGeneratingType() != null ? edge.getGeneratingType() : AttributeType.EARTH;
             edges.add(new ClientLaylineEdge(
                     edge.nodeA(),

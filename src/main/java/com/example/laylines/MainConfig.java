@@ -34,6 +34,18 @@ public class MainConfig {
 
         private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
+        private static final ForgeConfigSpec.IntValue FLOW_FREQUENCY = BUILDER
+                        .comment("Tick frequency to evaluate energy flow (default: 2000 ticks).")
+                        .defineInRange("flow.frequency", 2000, 1, 72000);
+
+        private static final ForgeConfigSpec.IntValue FLOW_RATE = BUILDER
+                        .comment("How much energy a node can output (default: 2). This packet of all attributes is sent to a single node.")
+                        .defineInRange("flow.rate", 2, 1, 10);
+
+        private static final ForgeConfigSpec.IntValue FLOW_NODES = BUILDER
+                        .comment("How many nodes can be flowing at once (default: 10).")
+                        .defineInRange("flow.nodes", 10, 1, 100);
+
         private static List<? extends Config> createDefaultAnchorRules() {
                 List<Config> list = new ArrayList<>();
                 for (StructureAnchorRule rule : ConfigDefaults.ANCHOR_RULES_DEFAULTS) {
@@ -55,11 +67,11 @@ public class MainConfig {
                 return list;
         }
 
-        private static final ForgeConfigSpec.ConfigValue<List<? extends com.electronwill.nightconfig.core.Config>> ANCHOR_RULES = BUILDER
+        private static final ForgeConfigSpec.ConfigValue<List<? extends Config>> ANCHOR_RULES = BUILDER
                         .comment("Structure anchor rules. Use TOML table syntax, e.g.:\n[[anchor_rules]]\nstructure = \"minecraft:desert_pyramid\"\npriority = 100\n[anchor_rules.odds]\nFIRE = 50\nEARTH = 20\nDARK = 30\n[anchor_rules.caps]\nFIRE = \"100-200\"\nEARTH = \"80-150\"\nDARK = \"60-120\"\n\nAdd additional [[anchor_rules]] tables for other structures.")
                         .defineListAllowEmpty("anchor_rules",
                                         createDefaultAnchorRules(),
-                                        obj -> obj instanceof com.electronwill.nightconfig.core.UnmodifiableConfig
+                                        obj -> obj instanceof UnmodifiableConfig
                                                         || obj instanceof Map);
 
         // General Phenomena Config
@@ -338,6 +350,18 @@ public class MainConfig {
                         return Map.entry(id, new PhenomenaRule(cost, range, chance, strength));
                 }
                 return null;
+        }
+
+        public static int getFlowFrequency() {
+                return FLOW_FREQUENCY.get();
+        }
+
+        public static int getFlowRate() {
+                return FLOW_RATE.get();
+        }
+
+        public static int getFlowNodes() {
+                return FLOW_NODES.get();
         }
 
         public static int getPhenomenaEvaluationFrequencyTicks() {
