@@ -46,6 +46,10 @@ public class MainConfig {
                         .comment("How many nodes can be flowing at once (default: 10).")
                         .defineInRange("flow.nodes", 10, 1, 100);
 
+        private static final ForgeConfigSpec.IntValue GENERATION_FREQUENCY = BUILDER
+                        .comment("Tick frequency to evaluate energy generation (default: 20 ticks).")
+                        .defineInRange("generation.frequency", 20, 1, 72000);
+
         private static List<? extends Config> createDefaultAnchorRules() {
                 List<Config> list = new ArrayList<>();
                 for (StructureAnchorRule rule : ConfigDefaults.ANCHOR_RULES_DEFAULTS) {
@@ -362,6 +366,10 @@ public class MainConfig {
 
         public static int getFlowNodes() {
                 return FLOW_NODES.get();
+        }
+
+        public static int getGenerationFrequency() {
+                return GENERATION_FREQUENCY.get();
         }
 
         public static int getPhenomenaEvaluationFrequencyTicks() {
