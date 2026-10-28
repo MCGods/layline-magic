@@ -8,48 +8,42 @@ import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Client-side Data Transfer Object (DTO) for a layline edge.
- * Contains only rendering and interaction data; never exposes internal cell
- * coordinates
- * or raw server capacities.
+ * Contains rendering data with full source node information and target
+ * position.
  */
 public record ClientLaylineEdge(
-        BlockPos nodeA,
-        BlockPos nodeB,
-        AttributeType dominantType,
-        int scaledEnergy) {
-
-    /**
-     * Scales a server energy pool value to the client range [0, 10] using integer
-     * division by 10.
-     */
-    public static int scaleEnergy(float energy) {
-        if (energy <= 0.0f) {
-            return 0;
-        }
-        return Math.min(10, (int) (energy / 10.0f));
-    }
+        LaylineNode nodeA,
+        BlockPos nodeB) {
 
     /**
      * Factory to construct client edge data from server nodes.
      */
     public static ClientLaylineEdge fromServer(LaylineNode source, LaylineNode target) {
-        AttributeType type = source.getGeneratingType() != null ? source.getGeneratingType() : AttributeType.EARTH;
-        int scaled = scaleEnergy(source.getCurrentValue(type));
-        return new ClientLaylineEdge(source.getPosition(), target.getPosition(), type, scaled);
+        return new ClientLaylineEdge(source, target.getPosition());
+    }
+
+    /**
+     * Gets the dominant attribute type from the source node.
+     */
+    public AttributeType getDominantType() {
+        return nodeA.getGeneratingType() != null ? nodeA.getGeneratingType() : AttributeType.EARTH;
+    }
+
+    /**
+     * Gets the raw energy value for the dominant type from the source node.
+     */
+    public float getEnergy() {
+        return nodeA.getCurrentValue(getDominantType());
     }
 
     public void encode(FriendlyByteBuf buffer) {
-        buffer.writeBlockPos(nodeA);
+        nodeA.encode(buffer);
         buffer.writeBlockPos(nodeB);
-        buffer.writeEnum(dominantType);
-        buffer.writeVarInt(scaledEnergy);
     }
 
     public static ClientLaylineEdge decode(FriendlyByteBuf buffer) {
-        BlockPos nodeA = buffer.readBlockPos();
+        LaylineNode nodeA = LaylineNode.decode(buffer);
         BlockPos nodeB = buffer.readBlockPos();
-        AttributeType dominantType = buffer.readEnum(AttributeType.class);
-        int scaledEnergy = buffer.readVarInt();
-        return new ClientLaylineEdge(nodeA, nodeB, dominantType, scaledEnergy);
+        return new ClientLaylineEdge(nodeA, nodeB);
     }
 }

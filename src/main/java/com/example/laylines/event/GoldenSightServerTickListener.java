@@ -3,7 +3,6 @@ package com.example.laylines.event;
 import com.example.laylines.LaylinesMod;
 import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineGraphApi;
-import com.example.laylines.api.LaylineNode.AttributeType;
 import com.example.laylines.clientdata.ClientLaylineEdge;
 import com.example.laylines.network.packet.laylineParticles.ClientboundLaylineSyncPacket;
 
@@ -74,13 +73,7 @@ public class GoldenSightServerTickListener {
 
         List<ClientLaylineEdge> edges = new ArrayList<>();
         for (LaylineEdge edge : nearbyEdges) {
-            // TODO: Remove, currently packets cannot be null
-            AttributeType type = edge.getGeneratingType() != null ? edge.getGeneratingType() : AttributeType.EARTH;
-            edges.add(new ClientLaylineEdge(
-                    edge.nodeA(),
-                    edge.nodeB(),
-                    type,
-                    ClientLaylineEdge.scaleEnergy(edge.getCurrentEnergy(type))));
+            edges.add(new ClientLaylineEdge(edge.source(), edge.target().getPosition()));
         }
 
         // Send packet to player

@@ -1,7 +1,6 @@
 package com.example.laylines;
 
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -49,6 +48,10 @@ public class MainConfig {
         private static final ForgeConfigSpec.IntValue GENERATION_FREQUENCY = BUILDER
                         .comment("Tick frequency to evaluate energy generation (default: 20 ticks).")
                         .defineInRange("generation.frequency", 20, 1, 72000);
+
+        private static final ForgeConfigSpec.IntValue LAYLINE_RENDER_QUALITY = BUILDER
+                        .comment("Layline render quality - number of segments per line strand (default: 10). Range: 10-50. Higher values = smoother lines but more GPU load.")
+                        .defineInRange("client.laylineRenderQuality", 10, 10, 50);
 
         private static List<? extends Config> createDefaultAnchorRules() {
                 List<Config> list = new ArrayList<>();
@@ -170,6 +173,10 @@ public class MainConfig {
                         refreshPhenomenaRules();
                 }
                 return cachedPhenomenaRules;
+        }
+
+        public static int getLaylineRenderQuality() {
+                return LAYLINE_RENDER_QUALITY.get();
         }
 
         public static synchronized void refreshPhenomenaRules() {

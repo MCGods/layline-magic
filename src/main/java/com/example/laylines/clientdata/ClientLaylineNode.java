@@ -13,26 +13,26 @@ import com.example.laylines.api.LaylineNode.AttributeType;
 
 /**
  * Client-side Data Transfer Object (DTO) for a layline node.
- * Contains only public coordinate information and scaled pool levels (0..10);
+ * Contains public coordinate information and raw pool levels;
  * never exposes internal cell coordinates or private server data.
  */
 public record ClientLaylineNode(
         UUID id,
         BlockPos position,
         AttributeType generatingType,
-        Map<AttributeType, Integer> scaledPools) {
+        Map<AttributeType, Float> pools) {
 
     public ClientLaylineNode {
-        scaledPools = Collections.unmodifiableMap(new EnumMap<>(scaledPools));
+        pools = Collections.unmodifiableMap(new EnumMap<>(pools));
     }
 
     /**
      * Factory to construct client node data from a server LaylineNode.
      */
     public static ClientLaylineNode fromServer(LaylineNode node) {
-        Map<AttributeType, Integer> pools = new EnumMap<>(AttributeType.class);
+        Map<AttributeType, Float> pools = new EnumMap<>(AttributeType.class);
         for (AttributeType type : AttributeType.values()) {
-            pools.put(type, ClientLaylineEdge.scaleEnergy(node.getCurrentValue(type)));
+            pools.put(type, node.getCurrentValue(type));
         }
         return new ClientLaylineNode(node.getId(), node.getPosition(), node.getGeneratingType(), pools);
     }
@@ -46,10 +46,10 @@ public record ClientLaylineNode(
         } else {
             buffer.writeBoolean(false);
         }
-        buffer.writeVarInt(scaledPools.size());
-        for (Map.Entry<AttributeType, Integer> entry : scaledPools.entrySet()) {
+        buffer.writeVarInt(pools.size());
+        for (Map.Entry<AttributeType, Float> entry : pools.entrySet()) {
             buffer.writeEnum(entry.getKey());
-            buffer.writeVarInt(entry.getValue());
+            buffer.writeFloat(entry.getValue());
         }
     }
 
@@ -58,10 +58,10 @@ public record ClientLaylineNode(
         BlockPos position = buffer.readBlockPos();
         AttributeType genType = buffer.readBoolean() ? buffer.readEnum(AttributeType.class) : null;
         int count = buffer.readVarInt();
-        Map<AttributeType, Integer> pools = new EnumMap<>(AttributeType.class);
+        Map<AttributeType, Float> pools = new EnumMap<>(AttributeType.class);
         for (int i = 0; i < count; i++) {
             AttributeType type = buffer.readEnum(AttributeType.class);
-            int val = buffer.readVarInt();
+            float val = buffer.readFloat();
             pools.put(type, val);
         }
         return new ClientLaylineNode(id, position, genType, pools);
