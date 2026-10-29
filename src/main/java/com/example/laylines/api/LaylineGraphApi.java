@@ -65,7 +65,7 @@ public final class LaylineGraphApi {
                 int cz = centerCellZ + dz;
 
                 LaylineNode node = LaylineGraphUtil.getDeterministicNode(seed, dimensionId, cx, cz, level);
-                if (filter != null && node.getGeneratingType() != filter) {
+                if (filter != null && !node.isGenerating(filter)) {
                     continue;
                 }
 
@@ -157,7 +157,7 @@ public final class LaylineGraphApi {
             for (int cz = minCellZ; cz <= maxCellZ; cz++) {
                 List<LaylineEdge> cellEdges = LaylineGraphUtil.getEdgesForCell(seed, dimensionId, cx, cz, level);
                 for (LaylineEdge edge : cellEdges) {
-                    if (filter != null && edge.getGeneratingType() != filter) {
+                    if (filter != null && !edge.source().isGenerating(filter)) {
                         continue;
                     }
                     double dist = LaylineLayoutUtil.pointToLineSegmentDistance(pos, edge.nodeA(), edge.nodeB());

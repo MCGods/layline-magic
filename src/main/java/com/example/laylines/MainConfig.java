@@ -53,6 +53,30 @@ public class MainConfig {
                         .comment("Layline render quality - number of segments per line strand (default: 10). Range: 10-50. Higher values = smoother lines but more GPU load.")
                         .defineInRange("client.laylineRenderQuality", 10, 10, 50);
 
+        private static final ForgeConfigSpec.IntValue ANCHOR_MAX_ATTRIBUTES = BUILDER
+                        .comment("Maximum number of generating attributes for structure anchors (default: 3). Range: 1-6.")
+                        .defineInRange("anchor.maxAttributes", 3, 1, 6);
+
+        private static final ForgeConfigSpec.DoubleValue ANCHOR_NODE_MUTATION = BUILDER
+                        .comment("Wildcard chance (0.0 - 1.0) for an anchor attribute to not be one of structure attributes (default: 0.05 = 5%).")
+                        .defineInRange("anchor.nodeMutation", 0.05, 0.0, 1.0);
+
+        private static final ForgeConfigSpec.IntValue SEED_FALLBACK_NONE_CHANCE = BUILDER
+                        .comment("Weight/odds for a seed fallback node to have 0 generating attributes (default: 15).")
+                        .defineInRange("seedFallback.noneChance", 15, 0, 10000);
+
+        private static final ForgeConfigSpec.IntValue SEED_FALLBACK_ONE_CHANCE = BUILDER
+                        .comment("Weight/odds for a seed fallback node to have 1 generating attribute (default: 80).")
+                        .defineInRange("seedFallback.oneChance", 80, 0, 10000);
+
+        private static final ForgeConfigSpec.IntValue SEED_FALLBACK_TWO_CHANCE = BUILDER
+                        .comment("Weight/odds for a seed fallback node to have 2 generating attributes (default: 4).")
+                        .defineInRange("seedFallback.twoChance", 4, 0, 10000);
+
+        private static final ForgeConfigSpec.IntValue SEED_FALLBACK_THREE_CHANCE = BUILDER
+                        .comment("Weight/odds for a seed fallback node to have 3 generating attributes (default: 1).")
+                        .defineInRange("seedFallback.threeChance", 1, 0, 10000);
+
         private static List<? extends Config> createDefaultAnchorRules() {
                 List<Config> list = new ArrayList<>();
                 for (StructureAnchorRule rule : ConfigDefaults.ANCHOR_RULES_DEFAULTS) {
@@ -177,6 +201,30 @@ public class MainConfig {
 
         public static int getLaylineRenderQuality() {
                 return LAYLINE_RENDER_QUALITY.get();
+        }
+
+        public static int getAnchorMaxAttributes() {
+                return ANCHOR_MAX_ATTRIBUTES.get();
+        }
+
+        public static double getAnchorNodeMutation() {
+                return ANCHOR_NODE_MUTATION.get();
+        }
+
+        public static int getSeedFallbackNoneChance() {
+                return SEED_FALLBACK_NONE_CHANCE.get();
+        }
+
+        public static int getSeedFallbackOneChance() {
+                return SEED_FALLBACK_ONE_CHANCE.get();
+        }
+
+        public static int getSeedFallbackTwoChance() {
+                return SEED_FALLBACK_TWO_CHANCE.get();
+        }
+
+        public static int getSeedFallbackThreeChance() {
+                return SEED_FALLBACK_THREE_CHANCE.get();
         }
 
         public static synchronized void refreshPhenomenaRules() {

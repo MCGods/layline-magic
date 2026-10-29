@@ -1,5 +1,6 @@
 package com.example.laylines.utils;
 
+import com.example.laylines.MainConfig;
 import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.LaylineNode.AttributeType;
@@ -12,6 +13,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -174,7 +177,7 @@ public final class LaylineGraphUtil {
      */
     public static LaylineNode createDeterministicNode(long worldSeed, String dimensionId, int cellX, int cellZ) {
         CellRoll roll = rollCell(worldSeed, dimensionId, cellX, cellZ);
-        return new LaylineNode(roll.id(), roll.position(), roll.generatingType());
+        return new LaylineNode(roll.id(), roll.position(), roll.generatingTypes());
     }
 
     /**
@@ -349,20 +352,49 @@ public final class LaylineGraphUtil {
                 LaylineNode.DEFAULT_Y,
                 cellZ * CELL_SIZE + offsetZ);
         UUID id = new UUID(random.nextLong(), random.nextLong());
-        AttributeType generatingType = rollGeneratingType(random);
-        return new CellRoll(position, id, generatingType);
+        Set<AttributeType> generatingTypes = rollSeedFallbackGeneratingTypes(random);
+        return new CellRoll(position, id, generatingTypes);
     }
 
-    /** Same 50% generation rule as {@link LaylineNode}, driven by the cell RNG. */
-    private static AttributeType rollGeneratingType(Random random) {
-        if (random.nextBoolean()) {
-            return null;
+    /**
+     * Rolls 0 to 3 generating attributes based on configurable seed fallback chances:
+     * default: 10 none, 60 one, 25 two, 5 three.
+     */
+    public static Set<AttributeType> rollSeedFallbackGeneratingTypes(Random random) {
+        int none = MainConfig.getSeedFallbackNoneChance();
+        int one = MainConfig.getSeedFallbackOneChance();
+        int two = MainConfig.getSeedFallbackTwoChance();
+        int three = MainConfig.getSeedFallbackThreeChance();
+
+        int totalWeight = none + one + two + three;
+        int count = 0;
+        if (totalWeight > 0) {
+            int roll = random.nextInt(totalWeight);
+            if (roll < none) {
+                count = 0;
+            } else if (roll < none + one) {
+                count = 1;
+            } else if (roll < none + one + two) {
+                count = 2;
+            } else {
+                count = 3;
+            }
         }
-        AttributeType[] types = AttributeType.values();
-        return types[random.nextInt(types.length)];
+
+        if (count <= 0) {
+            return Collections.emptySet();
+        }
+
+        List<AttributeType> available = new ArrayList<>(List.of(AttributeType.values()));
+        Collections.shuffle(available, random);
+        Set<AttributeType> selected = EnumSet.noneOf(AttributeType.class);
+        for (int i = 0; i < Math.min(count, available.size()); i++) {
+            selected.add(available.get(i));
+        }
+        return selected;
     }
 
-    private record CellRoll(BlockPos position, UUID id, AttributeType generatingType) {
+    private record CellRoll(BlockPos position, UUID id, Set<AttributeType> generatingTypes) {
     }
 
     private record CellKey(int x, int z) {

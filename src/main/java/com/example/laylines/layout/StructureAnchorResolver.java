@@ -1,5 +1,6 @@
 package com.example.laylines.layout;
 
+import com.example.laylines.MainConfig;
 import com.example.laylines.api.IntRange;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.LaylineNode.AttributeType;
@@ -17,10 +18,14 @@ import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -138,26 +143,70 @@ public final class StructureAnchorResolver {
                 chunkPos.z);
         Random rng = new Random(seed);
 
-        int totalWeight = rule.generationOdds().values().stream().mapToInt(Integer::intValue).sum();
-        int roll = rng.nextInt(totalWeight);
-        AttributeType chosen = null;
-        int cumulative = 0;
-        for (Map.Entry<AttributeType, Integer> e : rule.generationOdds().entrySet()) {
-            cumulative += e.getValue();
-            if (roll < cumulative) {
-                chosen = e.getKey();
+        int maxAttributes = Math.max(1, MainConfig.getAnchorMaxAttributes());
+        double mutationChance = MainConfig.getAnchorNodeMutation();
+
+        // Build pool of available odds per attribute type
+        Map<AttributeType, Integer> odds = new EnumMap<>(AttributeType.class);
+        for (AttributeType type : AttributeType.values()) {
+            int weight = rule.generationOdds().getOrDefault(type, 0);
+            odds.put(type, weight);
+        }
+
+        Set<AttributeType> chosenAttributes = EnumSet.noneOf(AttributeType.class);
+        int targetCount = Math.min(maxAttributes, AttributeType.values().length);
+
+        for (int i = 0; i < targetCount; i++) {
+            AttributeType chosen = null;
+
+            // Wildcard roll: 5% (configurable) odd of a roll of any available unique attribute
+            if (mutationChance > 0.0 && rng.nextDouble() < mutationChance) {
+                List<AttributeType> unchosen = new ArrayList<>();
+                for (AttributeType type : AttributeType.values()) {
+                    if (!chosenAttributes.contains(type)) {
+                        unchosen.add(type);
+                    }
+                }
+                if (!unchosen.isEmpty()) {
+                    chosen = unchosen.get(rng.nextInt(unchosen.size()));
+                }
+            } else {
+                int totalWeight = odds.values().stream().mapToInt(Integer::intValue).sum();
+                if (totalWeight > 0) {
+                    int roll = rng.nextInt(totalWeight);
+                    int cumulative = 0;
+                    for (Map.Entry<AttributeType, Integer> e : odds.entrySet()) {
+                        cumulative += e.getValue();
+                        if (roll < cumulative) {
+                            chosen = e.getKey();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (chosen != null) {
+                chosenAttributes.add(chosen);
+                odds.remove(chosen);
+            } else {
                 break;
             }
         }
-        if (chosen == null) {
-            chosen = rule.generationOdds().keySet().iterator().next();
+
+        // Fallback if none picked
+        if (chosenAttributes.isEmpty()) {
+            if (!rule.generationOdds().isEmpty()) {
+                chosenAttributes.add(rule.generationOdds().keySet().iterator().next());
+            } else {
+                chosenAttributes.add(AttributeType.FIRE);
+            }
         }
 
         BlockPos anchorPos = start.getBoundingBox().getCenter();
         BlockPos nodePos = new BlockPos(anchorPos.getX(), LaylineNode.DEFAULT_Y, anchorPos.getZ());
         UUID nodeId = new UUID(seed, ~seed);
 
-        LaylineNode node = new LaylineNode(nodeId, nodePos, chosen);
+        LaylineNode node = new LaylineNode(nodeId, nodePos, chosenAttributes);
 
         for (Map.Entry<AttributeType, IntRange> entry : rule.capacityRanges().entrySet()) {
             node.setCapacity(entry.getKey(), entry.getValue().random(rng));

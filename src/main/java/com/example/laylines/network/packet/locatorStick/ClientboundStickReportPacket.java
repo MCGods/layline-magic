@@ -111,14 +111,13 @@ public class ClientboundStickReportPacket {
     /** One chat line per field so the dump stays readable in the history. */
     private static List<String> formatNodeChatDump(LaylineNode node) {
         BlockPos pos = node.getPosition();
-        AttributeType generating = node.getGeneratingType();
         List<String> lines = new ArrayList<>();
         lines.add("=== Layline Node ===");
         lines.add("UUID: " + node.getId());
         // lines.add("Pos: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
         lines.add("Pools:");
         for (AttributeType type : AttributeType.values()) {
-            boolean active = type == generating;
+            boolean active = node.isGenerating(type);
             String line = String.format(Locale.ROOT, "%s%s: %.1f / %.1f%s",
                     active ? "* " : "  ",
                     type.name(),

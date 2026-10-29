@@ -16,7 +16,7 @@ Every single node tracks independent data pools for **all six attributes** (Fire
 * **Per-Attribute Data:** Capacity and Current Value are tracked **individually per attribute** (`fire_value`/`fire_capacity`, `water_value`/`water_capacity`, etc.). This ensures that a node generating intense Fire energy does not choke out or bottleneck Water or Air energy being piped through it from a neighbor.
 * **The 50% Generation Rule:** There is a 50% chance that a node is **non-generating** (all attribute generation Rates = 0), acting exclusively as a transmission point or an energy sinkhole.
 * **Structure-Driven Node Spawning:** When specific world structures generate (e.g., Desert Temples, Ocean Monuments, Villages), a Layline Node is forcibly anchored to that location. The structure type dictates its single active generating attribute:
-  * *Desert Temple:* 90% chance to be a Fire-generating node, 10% chance to be Dark-generating.
+  * *Desert Temple:* 50% chance to be a Fire-generating node, 40% earth, 10% chance to be Dark-generating.
 * **Biome Mapping (Fallback):** If a node spawns naturally without an anchoring structure, it defaults to a chance-based layout tied to its native biome type (managed via a configuration layout after a global 90% mapping attribute check):
   * *Taiga Forest:* 60% chance to generate Air, 40% chance to generate Water.
 * **Energy Flow Direction:** Flows are calculated deterministically across the network map during world creation using graph vector configurations. This creates a logical, non-clashing "river" of flowing attributes instead of a uniform grid direction.

@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.datafix.DataFixTypes;
@@ -18,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +45,7 @@ public class LaylinesData extends SavedData {
     private static final String X_KEY = "x";
     private static final String Y_KEY = "y";
     private static final String Z_KEY = "z";
-    private static final String GENERATING_TYPE_KEY = "generatingType";
+    private static final String GENERATING_TYPES_KEY = "generatingTypes";
     private static final String ATTRIBUTES_KEY = "attributes";
     private static final String ATTR_TYPE_KEY = "type";
     private static final String CAPACITY_KEY = "capacity";
@@ -94,9 +96,11 @@ public class LaylinesData extends SavedData {
             nodeTag.putInt(Y_KEY, pos.getY());
             nodeTag.putInt(Z_KEY, pos.getZ());
 
-            // Empty string means a non-generating (transmission-only) node.
-            AttributeType generatingType = node.getGeneratingType();
-            nodeTag.putString(GENERATING_TYPE_KEY, generatingType == null ? "" : generatingType.name());
+            ListTag genTypeList = new ListTag();
+            for (AttributeType genType : node.getGeneratingTypes()) {
+                genTypeList.add(StringTag.valueOf(genType.name()));
+            }
+            nodeTag.put(GENERATING_TYPES_KEY, genTypeList);
 
             ListTag attributeList = new ListTag();
             for (AttributeType type : AttributeType.values()) {
@@ -129,12 +133,16 @@ public class LaylinesData extends SavedData {
             UUID id = nodeTag.getUUID(UUID_KEY);
             BlockPos pos = new BlockPos(nodeTag.getInt(X_KEY), nodeTag.getInt(Y_KEY), nodeTag.getInt(Z_KEY));
 
-            String generatingName = nodeTag.getString(GENERATING_TYPE_KEY);
-            AttributeType generatingType = generatingName.isEmpty()
-                    ? null
-                    : AttributeType.valueOf(generatingName);
+            Set<AttributeType> genTypes = EnumSet.noneOf(AttributeType.class);
+            ListTag genTypeList = nodeTag.getList(GENERATING_TYPES_KEY, Tag.TAG_STRING);
+            for (int g = 0; g < genTypeList.size(); g++) {
+                try {
+                    genTypes.add(AttributeType.valueOf(genTypeList.getString(g)));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
 
-            LaylineNode node = new LaylineNode(id, pos, generatingType);
+            LaylineNode node = new LaylineNode(id, pos, genTypes);
 
             ListTag attributeList = nodeTag.getList(ATTRIBUTES_KEY, Tag.TAG_COMPOUND);
             for (int j = 0; j < attributeList.size(); j++) {
@@ -164,7 +172,7 @@ public class LaylinesData extends SavedData {
     public List<LaylineNode> getNodesGenerating(AttributeType type) {
         List<LaylineNode> matchingNodes = new ArrayList<>();
         for (LaylineNode node : nodes.values()) {
-            if (node.getGeneratingType() == type) {
+            if (node.isGenerating(type)) {
                 matchingNodes.add(node);
             }
         }

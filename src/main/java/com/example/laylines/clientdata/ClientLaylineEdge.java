@@ -22,20 +22,6 @@ public record ClientLaylineEdge(
         return new ClientLaylineEdge(source, target.getPosition());
     }
 
-    /**
-     * Gets the dominant attribute type from the source node.
-     */
-    public AttributeType getDominantType() {
-        return nodeA.getGeneratingType() != null ? nodeA.getGeneratingType() : AttributeType.EARTH;
-    }
-
-    /**
-     * Gets the raw energy value for the dominant type from the source node.
-     */
-    public float getEnergy() {
-        return nodeA.getCurrentValue(getDominantType());
-    }
-
     public void encode(FriendlyByteBuf buffer) {
         nodeA.encode(buffer);
         buffer.writeBlockPos(nodeB);

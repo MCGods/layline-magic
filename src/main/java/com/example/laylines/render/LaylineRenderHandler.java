@@ -132,12 +132,11 @@ public class LaylineRenderHandler {
      */
     private static List<LineStrand> calculateLineStrands(LaylineNode node) {
         List<LineStrand> strands = new ArrayList<>();
-        AttributeType generatingType = node.getGeneratingType();
 
         // Calculate strands for each attribute
         for (AttributeType attrType : AttributeType.values()) {
             float energy = node.getCurrentValue(attrType);
-            boolean isGenerating = attrType == generatingType;
+            boolean isGenerating = node.isGenerating(attrType);
 
             // Calculate number of lines based on energy for this attribute
             int lineCount = (int) (energy / THRESHOLD_FOR_LINES);

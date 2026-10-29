@@ -3,10 +3,14 @@ package com.example.laylines.api;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -80,10 +84,9 @@ public class LaylineNode {
     private BlockPos position;
 
     /**
-     * The one attribute this node generates, or {@code null} if it is a
-     * transmission-only / sinkhole node (the 50% generation rule).
+     * Set of attributes this node generates. Can contain 0 to multiple attributes.
      */
-    private AttributeType generatingType;
+    private final Set<AttributeType> generatingTypes = EnumSet.noneOf(AttributeType.class);
 
     private final EnumMap<AttributeType, AttributePool> attributes = new EnumMap<>(AttributeType.class);
 
@@ -113,41 +116,40 @@ public class LaylineNode {
     public LaylineNode(UUID id, BlockPos position) {
         this.id = id;
         this.position = position;
-        this.generatingType = rollGeneratingType(new Random());
         initAttributePools();
     }
 
     /**
-     * Full constructor for later loaders / tests: skip the random roll and
-     * supply the generating type directly ({@code null} = non-generating).
+     * Full constructor supporting multiple generating attributes.
      */
-    public LaylineNode(UUID id, BlockPos position, AttributeType generatingType) {
+    public LaylineNode(UUID id, BlockPos position, Collection<AttributeType> generatingTypes) {
         this.id = id;
         this.position = position;
-        this.generatingType = generatingType;
+        if (generatingTypes != null) {
+            this.generatingTypes.addAll(generatingTypes);
+        }
         initAttributePools();
     }
 
     /**
-     * Full constructor for later loaders / tests: skip the random roll and
-     * supply the generating type directly ({@code null} = non-generating).
+     * Full constructor for decoding / loaders.
      */
-    private LaylineNode(UUID id, BlockPos position, AttributeType generatingType,
+    public LaylineNode(UUID id, BlockPos position, Collection<AttributeType> generatingTypes,
             EnumMap<AttributeType, AttributePool> pools) {
         this.id = id;
         this.position = position;
-        this.generatingType = generatingType;
+        if (generatingTypes != null) {
+            this.generatingTypes.addAll(generatingTypes);
+        }
         this.attributes.putAll(pools);
     }
 
     public void encode(FriendlyByteBuf buffer) {
         buffer.writeUUID(id);
         buffer.writeBlockPos(position);
-        if (generatingType != null) {
-            buffer.writeBoolean(true);
-            buffer.writeEnum(generatingType);
-        } else {
-            buffer.writeBoolean(false);
+        buffer.writeVarInt(generatingTypes.size());
+        for (AttributeType type : generatingTypes) {
+            buffer.writeEnum(type);
         }
         for (AttributeType type : AttributeType.values()) {
             AttributePool pool = attributes.get(type);
@@ -160,29 +162,20 @@ public class LaylineNode {
     public static LaylineNode decode(FriendlyByteBuf buffer) {
         UUID id = buffer.readUUID();
         BlockPos position = buffer.readBlockPos();
-        AttributeType genType = buffer.readBoolean() ? buffer.readEnum(AttributeType.class) : null;
+        int genCount = buffer.readVarInt();
+        Set<AttributeType> genTypes = EnumSet.noneOf(AttributeType.class);
+        for (int i = 0; i < genCount; i++) {
+            genTypes.add(buffer.readEnum(AttributeType.class));
+        }
         EnumMap<AttributeType, AttributePool> pools = new EnumMap<>(AttributeType.class);
         for (int i = 0; i < AttributeType.values().length; i++) {
             AttributeType typeName = AttributeType.valueOf(buffer.readUtf());
             float capacity = buffer.readFloat();
             float currentValue = buffer.readFloat();
             pools.put(typeName, new AttributePool(capacity, currentValue));
-
         }
 
-        return new LaylineNode(id, position, genType, pools);
-    }
-
-    /**
-     * 50% chance of {@code null} (non-generating). Otherwise one of the six
-     * types is chosen uniformly.
-     */
-    private static AttributeType rollGeneratingType(Random random) {
-        if (random.nextBoolean()) {
-            return null;
-        }
-        AttributeType[] types = AttributeType.values();
-        return types[random.nextInt(types.length)];
+        return new LaylineNode(id, position, genTypes, pools);
     }
 
     private void initAttributePools() {
@@ -203,10 +196,10 @@ public class LaylineNode {
 
     /**
      * Rate this node currently generates for {@code type}.
-     * Only the matching {@link #generatingType} regenerates; everything else is 0.
+     * Only matching generating attributes regenerate; everything else is 0.
      */
     public float getGenerationRate(AttributeType type) {
-        if (type != null && type == generatingType) {
+        if (type != null && generatingTypes.contains(type)) {
             return BASE_REGENERATION_RATE;
         }
         return 0.0f;
@@ -225,18 +218,34 @@ public class LaylineNode {
     }
 
     /**
-     * {@code null} means this node does not generate any attribute.
+     * Returns an unmodifiable set of all attributes generated by this node.
      */
-    public AttributeType getGeneratingType() {
-        return generatingType;
+    public Set<AttributeType> getGeneratingTypes() {
+        return Collections.unmodifiableSet(generatingTypes);
     }
 
-    public void setGeneratingType(AttributeType generatingType) {
-        this.generatingType = generatingType;
+    /**
+     * Sets the attributes generated by this node.
+     */
+    public void setGeneratingTypes(Collection<AttributeType> types) {
+        this.generatingTypes.clear();
+        if (types != null) {
+            this.generatingTypes.addAll(types);
+        }
     }
 
+    /**
+     * Checks if a specific attribute is generated by this node.
+     */
+    public boolean isGenerating(AttributeType type) {
+        return type != null && generatingTypes.contains(type);
+    }
+
+    /**
+     * Checks if this node generates any attribute.
+     */
     public boolean isGenerating() {
-        return generatingType != null;
+        return !generatingTypes.isEmpty();
     }
 
     public AttributePool getAttribute(AttributeType type) {
@@ -281,7 +290,7 @@ public class LaylineNode {
     public String toString() {
         return "LaylineNode{id=" + id
                 + ", pos=" + position
-                + ", generating=" + generatingType
+                + ", generating=" + generatingTypes
                 + "}";
     }
 }
