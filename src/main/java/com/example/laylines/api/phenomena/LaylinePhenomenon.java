@@ -39,7 +39,7 @@ public abstract class LaylinePhenomenon implements ILaylineEffect {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return PhenomenaRegistry.getRule(this).enabled();
     }
 
     /**

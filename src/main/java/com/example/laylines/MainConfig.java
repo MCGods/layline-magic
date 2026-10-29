@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 import org.slf4j.Logger;
 
@@ -114,19 +115,13 @@ public class MainConfig {
                         .comment("Number of random loaded edges picked for evaluation each interval (default: 4).")
                         .defineInRange("phenomena.evaluateEdgeCount", 4, 1, 64);
 
-        private static final ForgeConfigSpec.BooleanValue MIRACLE_GROWTH_ENABLED = BUILDER
-                        .comment("Whether Miracle Growth phenomenon is enabled.")
-                        .define("phenomena.miracleGrowth.enabled", true);
-        private static final ForgeConfigSpec.BooleanValue CURSED_NIGHT_ENABLED = BUILDER
-                        .comment("Whether Cursed Night phenomenon is enabled.")
-                        .define("phenomena.cursedNight.enabled", true);
-
         private static List<? extends Config> createDefaultPhenomenaRules() {
                 List<Config> list = new ArrayList<>();
                 for (Map.Entry<ResourceLocation, PhenomenaRule> entry : ConfigDefaults.PHENOMENA_RULES_DEFAULTS
                                 .entrySet()) {
                         Config table = Config.inMemory();
                         table.set("phenomenon", entry.getKey().toString());
+                        table.set("enabled", entry.getValue().enabled());
                         table.set("range", entry.getValue().range());
                         table.set("chance", entry.getValue().chance());
                         table.set("strength", entry.getValue().strength());
@@ -141,7 +136,7 @@ public class MainConfig {
         }
 
         private static final ForgeConfigSpec.ConfigValue<List<? extends Config>> PHENOMENA_RULES = BUILDER
-                        .comment("Phenomena rules. Use TOML table syntax, e.g.:\n[[phenomena_rules]]\nphenomenon = \"laylines:miracle_growth\"\nrange = 10.0\nchance = 1.0\nstrength = 8\n[phenomena_rules.cost]\nEARTH = 5.0\n\nAdd additional [[phenomena_rules]] tables for other phenomena.")
+                        .comment("Phenomena rules. Use TOML table syntax, e.g.:\n[[phenomena_rules]]\nphenomenon = \"laylines:miracle_growth\"\nenabled = true\nrange = 10.0\nchance = 1.0\nstrength = 8\n[phenomena_rules.cost]\nEARTH = 5.0\n\nAdd additional [[phenomena_rules]] tables for other phenomena.")
                         .defineListAllowEmpty("phenomena_rules",
                                         createDefaultPhenomenaRules(),
                                         obj -> obj instanceof UnmodifiableConfig || obj instanceof Map);
@@ -348,67 +343,64 @@ public class MainConfig {
                 return null;
         }
 
-        private static Map.Entry<ResourceLocation, PhenomenaRule> parsePhenomenaRule(Object obj) {
-                if (obj instanceof UnmodifiableConfig table) {
-                        String phenomStr = table.get("phenomenon");
-                        if (phenomStr == null || phenomStr.isBlank()) {
-                                return null;
-                        }
-                        ResourceLocation id = new ResourceLocation(phenomStr);
-                        Number rangeNum = table.get("range");
-                        double range = rangeNum != null ? rangeNum.doubleValue() : 10.0;
-                        Number chanceNum = table.get("chance");
-                        double chance = chanceNum != null ? chanceNum.doubleValue() : 1.0;
-                        Number strengthNum = table.get("strength");
-                        int strength = strengthNum != null ? strengthNum.intValue() : 8;
-
-                        Map<LaylineNode.AttributeType, Float> cost = new EnumMap<>(LaylineNode.AttributeType.class);
-                        Object rawCost = table.get("cost");
-                        if (rawCost instanceof UnmodifiableConfig costConfig) {
-                                for (UnmodifiableConfig.Entry entry : costConfig.entrySet()) {
-                                        try {
-                                                LaylineNode.AttributeType type = LaylineNode.AttributeType
-                                                                .valueOf(entry.getKey().toUpperCase(Locale.ROOT));
-                                                if (entry.getValue() instanceof Number n) {
-                                                        cost.put(type, n.floatValue());
-                                                }
-                                        } catch (IllegalArgumentException ignored) {
-                                        }
-                                }
-                        }
-
-                        return Map.entry(id, new PhenomenaRule(cost, range, chance, strength));
-                } else if (obj instanceof Map<?, ?> map) {
-                        Object phenomVal = map.get("phenomenon");
-                        if (phenomVal == null)
-                                return null;
-                        ResourceLocation id = new ResourceLocation(phenomVal.toString());
-
-                        Object rangeVal = map.get("range");
-                        double range = rangeVal instanceof Number n ? n.doubleValue() : 10.0;
-                        Object chanceVal = map.get("chance");
-                        double chance = chanceVal instanceof Number n ? n.doubleValue() : 1.0;
-                        Object strengthVal = map.get("strength");
-                        int strength = strengthVal instanceof Number n ? n.intValue() : 8;
-
-                        Map<LaylineNode.AttributeType, Float> cost = new EnumMap<>(LaylineNode.AttributeType.class);
-                        Object rawCost = map.get("cost");
-                        if (rawCost instanceof Map<?, ?> costMap) {
-                                for (Map.Entry<?, ?> entry : costMap.entrySet()) {
-                                        try {
-                                                LaylineNode.AttributeType type = LaylineNode.AttributeType.valueOf(
-                                                                entry.getKey().toString().toUpperCase(Locale.ROOT));
-                                                if (entry.getValue() instanceof Number n) {
-                                                        cost.put(type, n.floatValue());
-                                                }
-                                        } catch (IllegalArgumentException ignored) {
-                                        }
-                                }
-                        }
-
-                        return Map.entry(id, new PhenomenaRule(cost, range, chance, strength));
+        private static Object getTableValue(Object container, String key) {
+                if (container instanceof UnmodifiableConfig cfg) {
+                        return cfg.get(key);
+                } else if (container instanceof Map<?, ?> map) {
+                        return map.get(key);
                 }
                 return null;
+        }
+
+        private static void forEachEntry(Object container, BiConsumer<String, Object> consumer) {
+                if (container instanceof UnmodifiableConfig cfg) {
+                        for (UnmodifiableConfig.Entry entry : cfg.entrySet()) {
+                                consumer.accept(entry.getKey(), entry.getValue());
+                        }
+                } else if (container instanceof Map<?, ?> map) {
+                        for (Map.Entry<?, ?> entry : map.entrySet()) {
+                                if (entry.getKey() != null) {
+                                        consumer.accept(entry.getKey().toString(), entry.getValue());
+                                }
+                        }
+                }
+        }
+
+        private static Map.Entry<ResourceLocation, PhenomenaRule> parsePhenomenaRule(Object obj) {
+                Object phenomVal = getTableValue(obj, "phenomenon");
+                if (phenomVal == null || phenomVal.toString().isBlank()) {
+                        return null;
+                }
+                ResourceLocation id = new ResourceLocation(phenomVal.toString());
+
+                Object enabledVal = getTableValue(obj, "enabled");
+                boolean enabled = enabledVal instanceof Boolean b ? b : true;
+
+                Object rangeVal = getTableValue(obj, "range");
+                double range = rangeVal instanceof Number n ? n.doubleValue() : 10.0;
+
+                Object chanceVal = getTableValue(obj, "chance");
+                double chance = chanceVal instanceof Number n ? n.doubleValue() : 1.0;
+
+                Object strengthVal = getTableValue(obj, "strength");
+                int strength = strengthVal instanceof Number n ? n.intValue() : 8;
+
+                Map<LaylineNode.AttributeType, Float> cost = new EnumMap<>(LaylineNode.AttributeType.class);
+                Object rawCost = getTableValue(obj, "cost");
+                if (rawCost != null) {
+                        forEachEntry(rawCost, (key, value) -> {
+                                try {
+                                        LaylineNode.AttributeType type = LaylineNode.AttributeType
+                                                        .valueOf(key.toUpperCase(Locale.ROOT));
+                                        if (value instanceof Number n) {
+                                                cost.put(type, n.floatValue());
+                                        }
+                                } catch (IllegalArgumentException ignored) {
+                                }
+                        });
+                }
+
+                return Map.entry(id, new PhenomenaRule(enabled, cost, range, chance, strength));
         }
 
         public static int getFlowFrequency() {
@@ -435,17 +427,9 @@ public class MainConfig {
                 return PHENOMENA_EVALUATE_EDGE_COUNT.get();
         }
 
-        public static boolean isMiracleGrowthEnabled() {
-                return MIRACLE_GROWTH_ENABLED.get();
-        }
-
         private static boolean validateItemName(final Object obj) {
                 return obj instanceof final String itemName
                                 && ForgeRegistries.ITEMS.containsKey(new ResourceLocation(itemName));
-        }
-
-        public static boolean isCursedNightEnabled() {
-                return CURSED_NIGHT_ENABLED.get();
         }
 
 }

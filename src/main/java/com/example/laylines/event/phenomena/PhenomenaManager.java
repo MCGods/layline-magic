@@ -73,6 +73,9 @@ public class PhenomenaManager {
             }
 
             PhenomenaRule rule = PhenomenaRegistry.getRule(phenomenon);
+            if (!rule.enabled()) {
+                continue;
+            }
 
             // Check if source node can afford at least 1 target
             int maxAffordable = rule.calculateMaxAffordable(sourceNode);

@@ -1,7 +1,6 @@
 package com.example.laylines.event.phenomena;
 
 import com.example.laylines.LaylinesMod;
-import com.example.laylines.MainConfig;
 import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.LaylineNode.AttributeType;
@@ -37,6 +36,7 @@ public class CursedNightPhenomenon extends LaylinePhenomenon {
     public static final ResourceLocation ID = new ResourceLocation(LaylinesMod.MODID, "cursed_night");
 
     private static final PhenomenaRule DEFAULT_RULE = new PhenomenaRule(
+            true,
             Map.of(AttributeType.DARK, 10.0f),
             16.0, 1, 2);
 
@@ -46,11 +46,6 @@ public class CursedNightPhenomenon extends LaylinePhenomenon {
 
     public CursedNightPhenomenon() {
         super(ID, "Cursed Night", 100);
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return MainConfig.isCursedNightEnabled();
     }
 
     @Override

@@ -1,7 +1,6 @@
 package com.example.laylines.event.phenomena;
 
 import com.example.laylines.LaylinesMod;
-import com.example.laylines.MainConfig;
 import com.example.laylines.api.LaylineEdge;
 import com.example.laylines.api.LaylineNode;
 import com.example.laylines.api.LaylineNode.AttributeType;
@@ -39,6 +38,7 @@ public class MiracleGrowthPhenomenon extends LaylinePhenomenon {
     public static final ResourceLocation ID = new ResourceLocation(LaylinesMod.MODID, "miracle_growth");
 
     private static final PhenomenaRule DEFAULT_RULE = new PhenomenaRule(
+            true,
             Map.of(AttributeType.EARTH, 5.0f),
             10.0, 1.0, 8);
 
@@ -48,11 +48,6 @@ public class MiracleGrowthPhenomenon extends LaylinePhenomenon {
 
     public MiracleGrowthPhenomenon() {
         super(ID, "Miracle Growth", 100);
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return MainConfig.isMiracleGrowthEnabled();
     }
 
     @Override

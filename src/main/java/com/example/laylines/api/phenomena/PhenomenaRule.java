@@ -10,17 +10,23 @@ import java.util.Map;
 /**
  * Immutable configuration rule for a layline phenomenon or effect.
  *
+ * @param enabled  Whether this phenomenon is active and allowed to trigger.
  * @param cost     Per-target mana cost required from the source node, mapped by attribute type.
  * @param range    Maximum horizontal distance in blocks from the layline edge.
  * @param chance   Probability (0.0 to 1.0) of this phenomenon activating on an affordable edge.
  * @param strength Maximum number of targets affected per activation (e.g. crops grown, entities affected).
  */
 public record PhenomenaRule(
+        boolean enabled,
         Map<AttributeType, Float> cost,
         double range,
         double chance,
         int strength
 ) {
+    public PhenomenaRule(Map<AttributeType, Float> cost, double range, double chance, int strength) {
+        this(true, cost, range, chance, strength);
+    }
+
     public PhenomenaRule {
         Map<AttributeType, Float> copy = new EnumMap<>(AttributeType.class);
         if (cost != null) {
